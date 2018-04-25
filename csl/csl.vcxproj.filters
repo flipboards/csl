@@ -1,0 +1,76 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="grammar">
+      <UniqueIdentifier>{1e965dd4-095e-4eba-bf61-026232457511}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util">
+      <UniqueIdentifier>{002c7ca1-765a-473d-bd05-129aeaedd40d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="test">
+      <UniqueIdentifier>{65a13af5-0e3c-4d57-8278-1c0fb362bf68}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="csl">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="lexer.cpp">
+      <Filter>csl</Filter>
+    </ClCompile>
+    <ClCompile Include="test\main.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_lexer.h">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="rdparser.cpp">
+      <Filter>csl</Filter>
+    </ClCompile>
+    <ClCompile Include="logger.cpp">
+      <Filter>csl</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="lexer.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="grammar\grammar.h">
+      <Filter>grammar</Filter>
+    </ClInclude>
+    <ClInclude Include="token.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="value.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="util\ioutil.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\errors.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\strutil.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="parser.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="ast.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="astbuilder.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="operator.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="type.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="logger.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
