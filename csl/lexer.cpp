@@ -11,9 +11,8 @@ std::regex Lexer::re_char("'(?:\\\\.|[^'\\\\])*'");
 std::regex Lexer::re_str("\"(?:\\\\.|[^\"\\\\])*\"");
 std::regex Lexer::re_int("\\d+");
 std::regex Lexer::re_float("\\d*(?:\\.|e[+\\-]?)\\d+");
-std::regex Lexer::re_op("\\+\\+|\\-\\-|\\!\\=|\\-\\>|[\\+\\-\\*\\/\\%\\=\\^\\<\\>]\\=?|[\\.\\,\\:\\{\\}\\(\\)\\[\\]]");
+std::regex Lexer::re_op("\\+\\+|\\-\\-|\\!\\=|\\-\\>|[\\+\\-\\*\\/\\%\\=\\^\\<\\>]\\=?|[\\.\\,\\:\\;\\{\\}\\(\\)\\[\\]]");
 std::regex Lexer::re_ws("[ \\t\\n]+");
-std::regex Lexer::re_eol(";");
 
 std::regex re_single_char("'\\\\?.'");
 
@@ -29,8 +28,8 @@ std::unordered_map<std::string, OpName> Lexer::op_loc {
     {"++", OpName::INC}, {"--", OpName::DEC}, {"==", OpName::EQ}, {"!=", OpName::NE}, {"<", OpName::LT}, {"<=", OpName::LE}, 
     {">", OpName::GT}, {">=", OpName::GE}, {"and", OpName::AND}, {"or", OpName::OR}, {"xor", OpName::XOR}, {"not", OpName::NOT},
     {"(", OpName::BRAC}, {")", OpName::RBRAC}, {"[", OpName::INDEX}, {"]", OpName::RINDEX}, {"=", OpName::ASN}, {"+=", OpName::ADDASN},
-    {"-=", OpName::SUBASN}, {"*=", OpName::MULASN}, {"/=", OpName::DIVASN}, {"%=", OpName::MODASN}, {"^=", OpName::POWASN},
-    {".", OpName::MBER}, {"->", OpName::ARROW}, {",", OpName::COMMA}, {":", OpName::COLON}, {"{", OpName::COMP}, {"}", OpName::RCOMP}
+    {"-=", OpName::SUBASN}, {"*=", OpName::MULASN}, {"/=", OpName::DIVASN}, {"%=", OpName::MODASN}, {"^=", OpName::POWASN}, {".", OpName::MBER},
+    {"->", OpName::ARROW}, {",", OpName::COMMA}, {":", OpName::COLON}, {";", OpName::SEMICOLON}, {"{", OpName::COMP}, {"}", OpName::RCOMP}
 };
 
 
@@ -82,65 +81,60 @@ void Lexer::fetch_token() {
 Token Lexer::_fetch_token() {
 
     if (_reader->eof()) {
-        return Token(Token::Type::EOF);
+        return Token(Token::EOF);
     }
 
     match(re_ws);
 
     if (_reader->eof()) {
-        return Token(Token::Type::EOF);
+        return Token(Token::EOF);
     }
-    else if (match(re_eol)) {
-        return Token(Token::Type::EOL);
-    }
+
     else if (match(re_char)) {
 
-        RawValue::Type vtype = std::regex_match(token_str, re_single_char) ? RawValue::Type::STRING : RawValue::Type::CHAR;
+        RawValue::Type vtype = std::regex_match(token_str, re_single_char) ? RawValue::STRING : RawValue::CHAR;
 
-        Token token(Token::Type::VALUE);
+        Token token(Token::VALUE);
         token.set_value(vtype, token_str.substr(1, token_str.length() - 2));
         return token;
     }
     else if (match(re_str)) {
-        Token token(Token::Type::VALUE);
-        token.set_value(RawValue::Type::STRING, token_str.substr(1, token_str.length() - 2));
+        Token token(Token::VALUE);
+        token.set_value(RawValue::STRING, token_str.substr(1, token_str.length() - 2));
         return token;
     }
     else if (match(re_op)) {
-        return Token(Token::Type::OP, static_cast<unsigned>(op_loc.find(token_str)->second));
+        return Token(Token::OP, static_cast<unsigned>(op_loc.find(token_str)->second));
     }
     else if (match(re_float)) {
-        Token token(Token::Type::VALUE);
-        token.set_value(RawValue::Type::FLOAT, token_str);
+        Token token(Token::VALUE);
+        token.set_value(RawValue::FLOAT, token_str);
         return token;
     }
     else if (match(re_int)) {
-        Token token(Token::Type::VALUE);
-        token.set_value(RawValue::Type::INT, token_str);
+        Token token(Token::VALUE);
+        token.set_value(RawValue::INT, token_str);
         return token;
     }
     else if (match(re_id)) {
 
         if (token_str == "true" || token_str == "false") {
-            Token token(Token::Type::VALUE);
-            token.set_value(RawValue::Type::BOOL, token_str);
+            Token token(Token::VALUE);
+            token.set_value(RawValue::BOOL, token_str);
             return token;
         }
 
         auto find_op_result = op_loc.find(token_str);
         if (find_op_result != op_loc.end()) {
-            return Token(Token::Token::OP, static_cast<unsigned>(find_op_result->second));
+            return Token(Token::OP, static_cast<unsigned>(find_op_result->second));
         }
 
         auto find_result = keyword_loc.find(token_str);
         if (find_result == keyword_loc.end()) {
-            return Token(Token::Type::ID, token_str);
-        }
-        else if (find_result->second >= Keyword::FN) {
-            return Token(Token::Type::DECL, static_cast<unsigned>(find_result->second));
+            return Token(Token::ID, token_str);
         }
         else {
-            return Token(Token::Type::CTRL, static_cast<unsigned>(find_result->second));
+            return Token(Token::KEYWORD, static_cast<unsigned>(find_result->second));
         }
     }
 

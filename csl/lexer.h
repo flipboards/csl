@@ -54,7 +54,6 @@ private:
     static std::regex re_int;
     static std::regex re_float;
     static std::regex re_id;
-    static std::regex re_eol;
     static std::regex re_str;
     static std::regex re_char;
     static std::unordered_map<std::string, OpName> op_loc;

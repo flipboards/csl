@@ -2,12 +2,14 @@
 #ifndef CSL_PARSER_H
 #define CSL_PARSER_H
 
-#include "ast.h"
 #include "token.h"
 #include "lexer.h"
+#include "ast.h"
+#include "value.h"
 
 #include <string>
 #include <map>
+#include <unordered_set>
 
 // Parser using recursive descent algorithm
 class RDParser {
@@ -22,9 +24,9 @@ public:
     }
 
     void clear() {
-        cur_token = Token(Token::Type::NONE);
-        next_token = Token(Token::Type::NONE);
-        next_look_token = Token(Token::Type::NONE);
+        cur_token = Token(Token::NONE);
+        next_token = Token(Token::NONE);
+        next_look_token = Token(Token::NONE);
         _lexer.clear();
     }
 
@@ -44,6 +46,10 @@ private:
 
     ExprAST* parse_expr();	
 
+    TypeAST* parse_type_base(StringRef);
+
+    TypeAST* parse_type();
+
     std::vector<VarDeclAST*> parse_var_decl();
 
     ExprAST* parse_initializer();
@@ -54,30 +60,31 @@ private:
 
     FunctionAST* parse_function_decl();
 
-    ValueAST* build_value_ast(const RawValue&);
+    ClassAST* parse_class_decl();
 
-    unsigned eval_const_expr(const ExprAST*);
+    Constant* parse_value(const RawValue&);
+
 
     void eat();
 
-    bool match(Token::Type);
+    bool match(Token::TokenType);
 
-    bool match(Token::Type, bool *f(const Token&));
+    bool match(Token::TokenType, bool(*unary_cond)(const Token&));
 
-    bool try_match(Token::Type)const;
+    bool try_match(Token::TokenType)const;
 
     bool match_op(OpName);
 
-    bool match_sep(OpName);
+    bool try_match_op(OpName);
 
-    bool try_match_sep(OpName);
+    bool match_keyword(Keyword);
 
+    bool try_match_keyword(Keyword);
 
-    // global cache for import different files
-    static std::map<StringRef, ASTBase*> ast_cache;
+    void match_required_symbol(OpName, char);
 
-    std::map<StringRef, ClassType*> type_cache; // cache for self-defined classes
-    
+    static std::map<std::string, ASTBase*> ast_cache; // global cache for import different files
+    static std::unordered_set<StringRef> typename_cache; // defined classes
 
     Token cur_token, next_token, next_look_token;
 

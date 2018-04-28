@@ -4,6 +4,7 @@
 
 #include "operator.h"
 #include "type.h"
+#include "value.h"
 
 #include <vector>
 #include <string>
@@ -16,8 +17,8 @@ typedef std::string StringRef;
 
 class ASTBase {
 public:
-    /*
-    enum Type {
+    
+    enum ASTType {
         NONE = 0x0, // default
         VALUE = 0x1,// terminal: value
         ID = 0x2,	// terminal: id
@@ -31,10 +32,22 @@ public:
         DECL = 0xa,	// declaration
         FN = 0xb,	// function definition
         ROOT = 0xc	// root
-    };*/
+    };
+
+    ASTBase() {
+
+    }
+
+    explicit ASTBase(ASTType type) : mytype(type) {
+
+    }
 
     virtual void print(std::ostream&, char indent='\t', int level = 0)const {
 
+    }
+
+    bool is_id()const {
+        return mytype == ID;
     }
 
     /* Notice: When destructing, only delete member that is also AST;
@@ -44,6 +57,9 @@ public:
 
     }
 
+protected:
+
+    ASTType mytype;
 };
 
 
@@ -125,8 +141,7 @@ public:
 
     }
 
-    ValueAST(const Type* tp, const char* v_start, size_t size) : type(tp), 
-        buffer(v_start, v_start + size) {
+    ValueAST(const Constant* c) : data(c) {
     }
 
     void add_child(ExprAST*) {
@@ -136,22 +151,22 @@ public:
     void print(std::ostream& os, char indent = '\t', int level = 0)const {
         for (int i = 0; i < level; i++) os << indent;
 
-        type->print(os);
+        data->get_type()->print(os);
         os << ' ';
 
-        switch (type->get_id())
+        switch (data->get_type()->get_id())
         {
             case Type::BOOL:
-                os << buffer[0] ? "true" : "false";
+                os << data->get_bool() ? "true" : "false";
                 break;
             case Type::CHAR:
-                os << '\'' << buffer[0] << '\'';
+                os << '\'' << data->get_char() << '\'';
                 break;
             case Type::INT:
-                os << *(unsigned*)&buffer[0];
+                os << data->get_int();
                 break;
             case Type::FLOAT:
-                os << *(double*)&buffer[0];
+                os << data->get_float();
                 break;
             default:
                 break;
@@ -161,8 +176,7 @@ public:
 
 private:
 
-    const Type* type;
-    std::vector<char> buffer;
+    const Constant* data;
 
 };
 
@@ -187,6 +201,10 @@ public:
         os << "id " << name << std::endl;
     }
 
+    StringRef get_name()const {
+        return name;
+    }
+
 private:
 
     StringRef name;
@@ -209,10 +227,7 @@ public:
 
     void add_child(ExprAST* child) {
         if (!callee) {
-            callee = dynamic_cast<IdAST*>(child);
-            if (!callee) {
-                throw std::bad_cast();
-            }
+            callee = static_cast<IdAST*>(child);
         }
         else {
             argv.push_back(child);
@@ -262,6 +277,92 @@ class DeclAST : ASTBase {
 };
 
 
+class TypeAST : public ASTBase {
+public:
+
+    enum RelationToChild {
+        NONE = 0,
+        POINTER,
+        ARRAY,
+        CLASS
+    };
+
+    struct ClassChild {
+        StringRef name;
+    };
+
+    TypeAST() {
+
+    }
+
+    explicit TypeAST(Type* type) : relation(NONE), child(type) {
+
+    }
+
+    explicit TypeAST(TypeAST* pointee) : relation(POINTER), child(pointee) {
+
+    }
+
+    explicit TypeAST(const StringRef& classname) : relation(CLASS), child(new ClassChild{ classname }) {
+
+    }
+
+    ~TypeAST() {
+        if (is_class_type()) {
+            delete child;
+        }
+    }
+
+    RelationToChild get_relation()const {
+        return relation;
+    }
+
+    TypeAST* get_pointee()const {
+        assert(relation == POINTER && "Is not pointer");
+        return reinterpret_cast<TypeAST*>(child);
+    }
+
+    Type* get_type()const {
+        assert(relation == NONE && "Is not primitive type");
+        return reinterpret_cast<Type*>(child);
+    }
+
+    bool is_primitive_type() {
+        return relation == NONE;
+    }
+
+    bool is_array_type() {
+        return relation == ARRAY;
+    }
+
+    bool is_class_type() {
+        return relation == CLASS;
+    }
+
+protected:
+    
+    RelationToChild relation;
+    void * child;
+};
+
+
+class ArrayTypeAST : public TypeAST {
+public:
+
+    ArrayTypeAST() {
+
+    }
+
+    ArrayTypeAST(TypeAST* typee, ExprAST* expr_size) : TypeAST(typee), expr_size(expr_size) {
+
+    }
+
+private:
+
+    ExprAST * expr_size;
+};
+
+
 // Variable declaration
 class VarDeclAST : DeclAST {
 public:
@@ -270,11 +371,11 @@ public:
 
     }
 
-    VarDeclAST(TypeRef type, StringRef name) : vartype(type), varname(name) {
+    VarDeclAST(TypeAST* type, StringRef name) : vartype(type), varname(name) {
 
     }
 
-    VarDeclAST(TypeRef type, StringRef name, ExprAST* initializer) :
+    VarDeclAST(TypeAST* type, StringRef name, ExprAST* initializer) :
         vartype(type), varname(name), initializer(initializer) {
 
     }
@@ -284,15 +385,27 @@ public:
     }
 
 private:
-    TypeRef vartype;
+    TypeAST* vartype;
     StringRef varname;
     ExprAST * initializer;
 };
 
 
 
-class BlockStmtAST : StmtAST {
+class BlockStmtAST : public StmtAST {
 public:
+
+    BlockStmtAST() {
+
+    }
+
+    void append(VarDeclAST* d) {
+        decl_list.push_back(d);
+    }
+
+    void append(StmtAST* d) {
+        stmt_list.push_back(d);
+    }
 
 private:
 
@@ -301,13 +414,27 @@ private:
 };
 
 class ControlAST : public StmtAST {
-
+public:
 };
 
 
-class IfAST : ControlAST {
+class IfAST : public ControlAST {
 
 public:
+
+    IfAST() : ControlAST(), condition(nullptr), true_stmt(nullptr), false_stmt(nullptr) {
+
+    }
+
+    IfAST(ExprAST* expr_cond, StmtAST* true_stmt) :
+        condition(expr_cond), true_stmt(true_stmt), false_stmt(nullptr) {
+
+    }
+
+    IfAST(ExprAST* expr_cond, StmtAST* true_stmt, StmtAST* false_stmt) :
+        condition(expr_cond), true_stmt(true_stmt), false_stmt(false_stmt) {
+
+    }
 
 private:
     ExprAST * condition;
@@ -316,8 +443,17 @@ private:
 };
 
 
-class WhileAST : public StmtAST {
+class WhileAST : public ControlAST {
 public:
+
+    WhileAST() : condition(nullptr), loop_stmt(nullptr) {
+
+    }
+
+    WhileAST(ExprAST* expr_cond, StmtAST* stmt) :
+        condition(expr_cond), loop_stmt(stmt) {
+
+    }
 
 private:
     ExprAST * condition;
@@ -325,8 +461,24 @@ private:
 };
 
 
-class ForAST : public StmtAST {
+class ForAST : public ControlAST {
 public:
+
+    ForAST() : init_expr(nullptr),
+        condition(nullptr),
+        loop_expr(nullptr),
+        loop_stmt(nullptr) {
+
+    }
+
+    explicit ForAST(ExprAST* init_expr, ExprAST* cond_expr, ExprAST* loop_expr, StmtAST* loop_stmt) :
+        init_expr(init_expr),
+        condition(cond_expr),
+        loop_expr(loop_expr),
+        loop_stmt(loop_stmt) {
+
+    }
+
 
 private:
     ExprAST * init_expr;
@@ -335,21 +487,29 @@ private:
     StmtAST * loop_stmt;
 };
 
-class ContinueAST : public StmtAST {
+class ContinueAST : public ControlAST {
 public:
 
 private:
 };
 
 
-class BreakAST : public StmtAST {
+class BreakAST : public ControlAST {
 public:
 
 private:
 };
 
-class ReturnAST : public StmtAST {
+class ReturnAST : public ControlAST {
 public:
+
+    ReturnAST() : ret_expr(nullptr) {
+
+    }
+
+    ReturnAST(ExprAST* ret_expr) : ret_expr(ret_expr) {
+
+    }
 
 private:
 
@@ -359,19 +519,67 @@ private:
 class FunctionAST : public DeclAST {
 public:
 
-    struct Signature {
-        StringRef name;
-        std::vector<const Type*> arg_types;
-        const Type* ret_type;
-    };
+    FunctionAST() : ret_type(nullptr), body(nullptr) {
+
+    }
+
+    explicit FunctionAST(StringRef name) : name(name), ret_type(nullptr), body(nullptr) {
+
+    }
+
+    void add_argument(TypeAST* type) {
+        arg_types.push_back(type);
+        arg_names.push_back(StringRef());
+    }
+
+    void add_argument(TypeAST* type, StringRef name) {
+        arg_types.push_back(type);
+        arg_names.push_back(name);
+    }
+
+    void set_return_type(TypeAST* type) {
+        ret_type = type;
+    }
+
+    void set_body_ast(BlockStmtAST* body_ast) {
+        body = body_ast;
+    }
 
 private:
     StringRef name;
-    std::vector<Type*> arg_types;
-    const Type* ret_type;
-
+    std::vector<TypeAST*> arg_types;
     std::vector<StringRef> arg_names;
+    TypeAST* ret_type;
+
     BlockStmtAST* body;
+};
+
+
+class ClassAST : public DeclAST {
+public:
+
+    ClassAST() : DeclAST() {
+
+    }
+
+    ClassAST(StringRef name) : name(name) {
+
+    }
+
+    void add_member(VarDeclAST* ast_member) {
+        ast_members.push_back(ast_member);
+    }
+
+    void add_method(FunctionAST* ast_method) {
+        ast_methods.push_back(ast_method);
+    }
+
+private:
+
+    StringRef name;
+    std::vector<VarDeclAST*> ast_members;
+    std::vector<FunctionAST*> ast_methods;
+
 };
 
 #endif // !CSL_AST_H

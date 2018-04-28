@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 
+// Base of all types
 class Type {
 public:
 
@@ -16,7 +17,8 @@ public:
         CHAR = 0x2,
         INT = 0x3,
         FLOAT = 0x4,
-        Label = 0x9,
+        Label = 0x8,
+        Function = 0x9,
         Pointer = 0xa,
         Array = 0xb,
         Class = 0xc
@@ -26,7 +28,7 @@ public:
 
     }
 
-    Type(TypeID id) : id(id) {
+    Type(const TypeID id) : id(id) {
 
     }
 
@@ -36,6 +38,14 @@ public:
 
     TypeID get_id()const {
         return id;
+    }
+
+    bool is_void()const {
+        return get_id() == VOID;
+    }
+
+    bool is_integer_type()const {
+        return get_id() < FLOAT && get_id() > VOID;
     }
 
     bool is_primitive()const {
@@ -51,6 +61,26 @@ public:
     }
 
     virtual void print(std::ostream& os)const {
+    }
+
+protected:
+
+    TypeID id;
+
+};
+
+// basic types (void, bool, char, int, float)
+class PrimitiveType : public Type {
+public:
+    PrimitiveType() : Type() {
+
+    }
+
+    PrimitiveType(const TypeID id) : Type(id) {
+        assert(is_primitive() && "Not a primitive type");
+    }
+
+    void print(std::ostream& os)const {
         switch (id)
         {
         case Type::VOID:
@@ -72,18 +102,9 @@ public:
             break;
         }
     }
-
-protected:
-
-    TypeID id;
-
 };
 
-class PrimitiveType : public Type {
-
-    using Type::Type;
-};
-
+// pointer
 class PointerType : public Type {
 public:
 

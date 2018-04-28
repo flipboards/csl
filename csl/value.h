@@ -1,53 +1,140 @@
-#pragma once
 
 #ifndef CSL_VALUE_H
 #define CSL_VALUE_H
 
 #include <cassert>
 #include <cstdint>
+#include <vector>
+
+#include "type.h"
+
+
+typedef std::vector<char> ByteRef;
+
 
 class Value {
 public:
 
-	enum Type {
-		NONE = 0x00,
-		CHAR = 0x03, // '.'
-		INT = 0x04,
-		FLOAT = 0x05,
-		STR =0x06 // " ..."
-	};
+    Value() : type(nullptr) {
 
-	Value() : _type(Type::NONE), _strdata(nullptr) {
-	}
-	Value(Type type) : _type(type), _strdata(nullptr) {
-	}
+    }
 
-	
+    explicit Value(bool is_const) : is_const(is_const) {
 
-	// set data for int/char
-	void set_data(int data) {
-		assert(_type == Type::CHAR || _type == Type::INT);
-		_uintdata = static_cast<uint32_t>(data);
-	}
+    }
 
-	int get_data()const {
-		assert(_type == Type::CHAR || _type == Type::INT);
-		return static_cast<int>(_uintdata);
-	}
+    explicit Value(const Type* tp, bool is_const) : type(tp), 
+        is_const(is_const) {
 
-	void set_string(const char* str) {
-		_strdata = const_cast<char*>(str);
-	}
+    }
 
-	const char* get_string()const {
-		return _strdata;
-	}
+    virtual ~Value() {
+
+    }
+
+    const Type* get_type()const {
+        return type;
+    }
+
+    bool is_constant()const {
+        return is_const;
+    }
+
+protected:
+
+    const Type* type;
+    bool is_const;
+};
+
+
+class Constant : public Value {
+public:
+
+    Constant() : Value(true) {
+
+    }
+
+    Constant(const Type* tp, const char* v_start, size_t size) :
+        Value(tp), buffer(v_start, v_start + size) {
+
+    }
+
+    bool get_bool()const {
+        assert(type->get_id() == Type::BOOL && "Is not boolean");
+        return *(bool*)&buffer[0];
+    }
+
+    char get_char()const {
+        assert(type->get_id() == Type::CHAR && "Is not char");
+        return buffer[0];
+    }
+
+    unsigned get_int()const {
+        assert(type->get_id() == Type::INT && "Is not int");
+        return *(int*)&buffer[0];
+    }
+
+    double get_float()const {
+        assert(type->get_id() == Type::FLOAT && "Is not float");
+        return *(float*)&buffer[0];
+    }
+
+    unsigned get_integer_value()const {
+        assert(type->is_integer_type() && "Is not inteager type");
+        switch (type->get_id())
+        {
+        case Type::BOOL:
+            return (int)get_bool();
+            break;
+        case Type::CHAR:
+            return (int)get_char();
+            break;
+        case Type::INT:
+            return (int)get_int();
+            break;
+        default:
+            break;
+        }
+    }
+
+    // output raw data
+    const char* get_string()const {
+        return &buffer[0];
+    }
+
+    ByteRef get_byteref()const {
+        return buffer;
+    }
 
 private:
+    ByteRef buffer;
+};
 
-	Type _type;
-	uint32_t _uintdata;
-	char* _strdata;
+
+class GlobalValue : public Value {
+public:
+
+    GlobalValue() : Value(true) {
+
+    }
+};
+
+
+class GlobalVar : public GlobalValue {
+public:
+
+    GlobalVar() {
+
+    }
+};
+
+
+class Function : public GlobalValue {
+
+};
+
+class MemoryRef : public Value {
+
 };
 
 #endif
