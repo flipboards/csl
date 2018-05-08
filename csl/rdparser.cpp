@@ -6,21 +6,21 @@
 #include "util/errors.h"
 
 
-std::map<std::string, ASTBase*> RDParser::ast_cache;
-std::unordered_set<StringRef> RDParser::typename_cache = { "void", "bool", "char", "int", "float" };
+std::map<std::string, ASTRef> RDParser::ast_cache;
+std::unordered_set<std::string> RDParser::typename_cache = { "void", "bool", "char", "int", "float" };
 
-ASTBase* RDParser::parse_string(const std::string& str) {
+StmtASTRef RDParser::parse_string(const std::string& str) {
 
     StrReader* reader = new StrReader(str);
     _lexer.load(reader);
     eat();
     auto parse_result = parse_expr();
     delete reader;
-    return parse_result;
+    return parse_result.cast<StmtAST>();
 }
 
 
-ExprAST* RDParser::parse_unary_expr() {
+ExprASTRef RDParser::parse_unary_expr() {
 
     ExprASTBuilder builder_prefix, builder_postfix;
 
@@ -109,15 +109,15 @@ ExprAST* RDParser::parse_unary_expr() {
 
     builder_prefix.extend_child(builder_postfix.get_ast());
 
-    return builder_prefix.get_ast();
+    return store_ast<ExprAST>(builder_prefix.get_ast());
 
 }
 
 
-ExprAST* RDParser::parse_simple_expr() {
+ExprASTRef RDParser::parse_simple_expr() {
 
     std::vector<Operator> op_stack = { Operator::NONE };
-    std::vector<ExprAST*> value_stack;
+    std::vector<ExprASTRef> value_stack;
 
     while (1) {
         value_stack.push_back(parse_unary_expr());
@@ -148,7 +148,7 @@ ExprAST* RDParser::parse_simple_expr() {
                 auto lval = value_stack.back();
                 value_stack.pop_back();
 
-                value_stack.push_back(new OpAST(op_stack.back(), lval, rval));
+                value_stack.push_back(store_ast<ExprAST>(new OpAST(op_stack.back(), lval, rval)));
                 op_stack.pop_back();
             }
             op_stack.push_back(op);
@@ -162,7 +162,7 @@ ExprAST* RDParser::parse_simple_expr() {
         auto lval = value_stack.back();
         value_stack.pop_back();
 
-        value_stack.push_back(new OpAST(op_stack.back(), lval, rval));
+        value_stack.push_back(store_ast<ExprAST>(new OpAST(op_stack.back(), lval, rval)));
         op_stack.pop_back();
     }
 
@@ -172,19 +172,20 @@ ExprAST* RDParser::parse_simple_expr() {
 }
 
 
-ExprAST* RDParser::parse_expr() {
+ExprASTRef RDParser::parse_expr() {
 
     if (match_op(OpName::SEMICOLON)) {
-        return nullptr;
+        return ExprASTRef();
     }
 
-    ExprAST* ast_lhs = parse_simple_expr(), *ast_ret;
+    ExprASTRef ast_lhs = parse_simple_expr();
+    ExprASTRef ast_ret;
 
     if (try_match(Token::OP)) {
         Operator op = static_cast<Operator>(next_token.get_operator());
         if (is_assignment(op)) {
             eat();
-            ast_ret = new OpAST(op, ast_lhs, parse_expr());
+            ast_ret = store_ast<ExprAST>(new OpAST(op, ast_lhs, parse_expr()));
         }
         else {
             ast_ret = ast_lhs;
@@ -198,27 +199,28 @@ ExprAST* RDParser::parse_expr() {
 
 }
 
-TypeAST * RDParser::parse_type_base(StringRef name) {
+TypeASTRef RDParser::parse_type_base(const StringRef& name) {
     
-    const std::map<StringRef, Type::TypeID> typeloc = {
+    const std::map<std::string, Type::TypeID> typeloc = {
         {"void", Type::VOID}, {"bool", Type::BOOL}, {"char", Type::CHAR},
         {"int", Type::INT}, {"float", Type::FLOAT}
     };
 
-    auto find_result = typeloc.find(name);
+    auto find_result = typeloc.find(name.to_string());  /// TODO: Using StringRef directly
     if (find_result == typeloc.end()) {
-        return new TypeAST(name);
+        return store_ast<TypeAST>(new TypeAST(name));
     }
     else {
-        return new TypeAST(new PrimitiveType(find_result->second));
+        TypeRef type = store_type(new PrimitiveType(find_result->second));
+        return store_ast<TypeAST>(new TypeAST(type));
     }
 }
 
-TypeAST * RDParser::parse_type() {
-    TypeAST* vartype;
+TypeASTRef RDParser::parse_type() {
+    TypeASTRef vartype;
 
     if (match(Token::ID)) {
-        if (typename_cache.find(cur_token.get_name()) == typename_cache.end()) {
+        if (typename_cache.find(cur_token.get_name().to_string()) == typename_cache.end()) {
             throw SyntaxError("Type undefined: " + cur_token.get_name());
         }
         vartype = parse_type_base(cur_token.get_name());
@@ -230,16 +232,16 @@ TypeAST * RDParser::parse_type() {
     while (1) {
         // pointer
         if (match_op(OpName::MUL)) {
-            vartype = new TypeAST(vartype);
+            vartype = store_ast<TypeAST>(new TypeAST(vartype));
 
         }
         else if (match_op(OpName::INDEX)) {
-            ExprAST* idx_ast = nullptr;
+            ExprASTRef idx_ast;
             if (!match_op(OpName::RINDEX)) {
                 idx_ast = parse_expr();
                 match_required_symbol(OpName::RINDEX, ']');
             }
-            vartype = new ArrayTypeAST(vartype, idx_ast);
+            vartype = store_ast<TypeAST>(new ArrayTypeAST(vartype, idx_ast));
         }
         else {
             break;
@@ -249,12 +251,12 @@ TypeAST * RDParser::parse_type() {
     return vartype;
 }
 
-std::vector<VarDeclAST*> RDParser::parse_var_decl() {
+std::vector<VarDeclASTRef> RDParser::parse_var_decl() {
 
-    TypeAST* vartype;
+    TypeASTRef vartype;
 
     if (match(Token::ID)) {
-        if (typename_cache.find(cur_token.get_name()) == typename_cache.end()) {
+        if (typename_cache.find(cur_token.get_name().to_string()) == typename_cache.end()) {
             throw SyntaxError("Type undefined: " + cur_token.get_name());
         }
         vartype = parse_type_base(cur_token.get_name());
@@ -263,27 +265,27 @@ std::vector<VarDeclAST*> RDParser::parse_var_decl() {
         throw SyntaxError("Type name required");
     }
 
-    std::vector<VarDeclAST*> decl_ast_list;
+    std::vector<VarDeclASTRef> decl_ast_list;
 
     while (1) {
 
-        TypeAST* cur_vartype = vartype;
+        TypeASTRef cur_vartype = vartype;
         StringRef cur_varname;
-        VarDeclAST* decl_ast;
+        VarDeclASTRef decl_ast;
 
         while (1) {
             // pointer
             if (match_op(OpName::MUL)) {
-                cur_vartype = new TypeAST(cur_vartype);
+                cur_vartype = store_ast<TypeAST>(new TypeAST(cur_vartype));
                 
             }
             else if (match_op(OpName::INDEX)) {
-                ExprAST* idx_ast = nullptr;
+                ExprASTRef idx_ast;
                 if (!match_op(OpName::RINDEX)) {
                     idx_ast = parse_expr();
                     match_required_symbol(OpName::RINDEX, ']');
                 }
-                cur_vartype = new ArrayTypeAST(cur_vartype, idx_ast);
+                cur_vartype = store_ast<TypeAST>(new ArrayTypeAST(cur_vartype, idx_ast));
             }
             else {
                 break;
@@ -298,12 +300,12 @@ std::vector<VarDeclAST*> RDParser::parse_var_decl() {
         }
 
         if (match_op(OpName::COMMA)) {
-            decl_ast_list.push_back(new VarDeclAST(cur_vartype, cur_varname));
+            decl_ast_list.push_back(store_ast<VarDeclAST>(new VarDeclAST(cur_vartype, cur_varname)));
             continue;
         }
         else if (match_op(OpName::ASN)) {
-            ExprAST* initializer = parse_initializer();
-            decl_ast_list.push_back(new VarDeclAST(cur_vartype, cur_varname, initializer));
+            ExprASTRef initializer = parse_initializer();
+            decl_ast_list.push_back(store_ast<VarDeclAST>(new VarDeclAST(cur_vartype, cur_varname, initializer)));
         }
         else {
             break;
@@ -314,11 +316,10 @@ std::vector<VarDeclAST*> RDParser::parse_var_decl() {
 
 }
 
-ExprAST * RDParser::parse_initializer()
+ExprASTRef RDParser::parse_initializer()
 {
-    ExprAST* initializer;
     if (match_op(OpName::COMP)) {
-        initializer = new ListAST();
+        ExprAST* initializer = new ListAST();
         while (1) {
             initializer->add_child(parse_initializer());
             if (!match_op(OpName::COMMA)) {
@@ -326,23 +327,23 @@ ExprAST * RDParser::parse_initializer()
             }
         }
         match_required_symbol(OpName::RCOMP, '}');
+        return store_ast<ExprAST>(initializer);
     }
     else {
-        initializer = parse_expr();
+        return parse_expr();
     }
-    return initializer;
 }
 
-StmtAST* RDParser::parse_stmt(){
+StmtASTRef RDParser::parse_stmt(){
     
     if (try_match_op(OpName::COMP)) {
-        return parse_block_stmt();
+        return parse_block_stmt().cast<StmtAST>();
     }
 
     else if (match_keyword(Keyword::IF)) {
         
-        ExprAST *expr_cond;
-        StmtAST *ast1, *ast2 = nullptr;
+        ExprASTRef expr_cond;
+        StmtASTRef ast1, ast2;
 
         match_required_symbol(OpName::BRAC, '(');
         expr_cond = parse_expr();
@@ -353,24 +354,24 @@ StmtAST* RDParser::parse_stmt(){
         if (match_keyword(Keyword::ELSE)) {
             ast2 = parse_stmt();
         }
-        return new IfAST(expr_cond, ast1, ast2);
+        return store_ast<StmtAST>(new IfAST(expr_cond, ast1, ast2));
     }
 
     else if (match_keyword(Keyword::WHILE)) {
 
-        ExprAST *expr_cond;
-        StmtAST *ast1;
+        ExprASTRef expr_cond;
+        StmtASTRef ast1;
 
         match_required_symbol(OpName::BRAC, '(');
         expr_cond = parse_expr();
         match_required_symbol(OpName::RBRAC, ')');
 
-        return new WhileAST(expr_cond, parse_stmt());
+        return store_ast<StmtAST>(new WhileAST(expr_cond, parse_stmt()));
     }
 
     else if (match_keyword(Keyword::FOR)) {
 
-        ExprAST *expr_init, *expr_cond, *expr_loop;
+        ExprASTRef expr_init, expr_cond, expr_loop;
 
         match_required_symbol(OpName::BRAC, '(');
         expr_init = parse_expr();
@@ -380,25 +381,25 @@ StmtAST* RDParser::parse_stmt(){
         expr_loop = parse_expr();
         match_required_symbol(OpName::RBRAC, ')');
 
-        return new ForAST(expr_init, expr_cond, expr_loop, parse_stmt());
+        return store_ast<StmtAST>(new ForAST(expr_init, expr_cond, expr_loop, parse_stmt()));
     }
 
     else if (match_keyword(Keyword::BREAK)) {
-        return new BreakAST();
+        return store_ast<StmtAST>(new BreakAST());
     }
     else if (match_keyword(Keyword::CONTINUE)) {
-        return new ContinueAST();
+        return store_ast<StmtAST>(new ContinueAST());
     }
     else if (match_keyword(Keyword::RETURN)) {
-        return new ReturnAST(parse_expr());
+        return store_ast<StmtAST>(new ReturnAST(parse_expr()));
     }
     else {
-        return parse_expr();
+        return parse_expr().cast<StmtAST>();
     }
 
 }
 
-BlockStmtAST * RDParser::parse_block_stmt() {
+BlockStmtASTRef RDParser::parse_block_stmt() {
     match_required_symbol(OpName::COMP, '{');
 
     BlockStmtAST* ast = new BlockStmtAST();
@@ -414,7 +415,7 @@ BlockStmtAST * RDParser::parse_block_stmt() {
             throw SyntaxError("Reach end of file");
         }
         else if (try_match(Token::ID)) {
-            auto find_result = typename_cache.find(next_token.get_name());
+            auto find_result = typename_cache.find(next_token.get_name().to_string());
             if (find_result == typename_cache.end()) {
                 for (const auto& i : parse_var_decl()) {
                     ast->append(i);
@@ -422,23 +423,23 @@ BlockStmtAST * RDParser::parse_block_stmt() {
             }
             else {
                 auto expr_ast = parse_expr();
-                if (expr_ast) {
-                    ast->append(expr_ast);
+                if (expr_ast.exists()) {
+                    ast->append(expr_ast.cast<StmtAST>());
                 }
             }
         }
         else {
             auto expr_ast = parse_expr();
-            if (expr_ast) {
-                ast->append(expr_ast);
+            if (expr_ast.exists()) {
+                ast->append(expr_ast.cast<StmtAST>());
             }
         }
     }
 
-    return ast;
+    return store_ast<BlockStmtAST>(ast);
 }
 
-FunctionAST * RDParser::parse_function_decl() {
+FunctionASTRef RDParser::parse_function_decl() {
 
     if (!match_keyword(Keyword::FN)) {
         throw SyntaxError("Requires 'fn' for function declaration");
@@ -458,12 +459,12 @@ FunctionAST * RDParser::parse_function_decl() {
     while (1) {
         if (match(Token::ID)) { // id:(type)
             StringRef arg_name = cur_token.get_name();
-            TypeAST* arg_type;
+            TypeASTRef arg_type;
             if (match_op(OpName::COLON)) {
                 arg_type = parse_type();
             }
             else {
-                arg_type = new TypeAST(new Type(Type::VOID));
+                arg_type = store_ast<TypeAST>(new TypeAST(store_type(new Type(Type::VOID))));
             }
             func->add_argument(arg_type, arg_name);
             if (match_op(OpName::RBRAC)) {
@@ -472,12 +473,12 @@ FunctionAST * RDParser::parse_function_decl() {
             match_required_symbol(OpName::COMMA, ',');
         }
         else if (match_op(OpName::COLON)) { // :(type)
-            TypeAST* arg_type;
+            TypeASTRef arg_type;
             if (match_op(OpName::COLON)) {
                 arg_type = parse_type();
             }
             else {
-                arg_type = new TypeAST(new Type(Type::VOID));
+                arg_type = store_ast<TypeAST>(new TypeAST(store_type(new Type(Type::VOID))));
             }
             func->add_argument(arg_type);
             if (match_op(OpName::RBRAC)) {
@@ -495,11 +496,12 @@ FunctionAST * RDParser::parse_function_decl() {
     match_required_symbol(OpName::RBRAC, ')');
 
     if (match_op(OpName::ARROW)) {
-        TypeAST* ret_type = parse_type();
+        TypeASTRef ret_type = parse_type();
         func->set_return_type(ret_type);
     }
     else {
-        func->set_return_type(new TypeAST(new Type(Type::VOID)));
+        func->set_return_type(store_ast<TypeAST>(new TypeAST(
+            store_type(new Type(Type::VOID)))));
     }
 
     if (try_match_op(OpName::COMP)) {
@@ -509,11 +511,11 @@ FunctionAST * RDParser::parse_function_decl() {
         match_required_symbol(OpName::SEMICOLON, ';');
     }
     
-    return func;
+    return store_ast<FunctionAST>(func);
 }
 
 
-ClassAST * RDParser::parse_class_decl() {
+ClassASTRef RDParser::parse_class_decl() {
     
     if (!match_keyword(Keyword::CLASS)) {
         throw SyntaxError("Invalid definition");
@@ -529,13 +531,13 @@ ClassAST * RDParser::parse_class_decl() {
 
     }
     else if (match_op(OpName::SEMICOLON)) {
-        return new_class;
+        return store_ast<ClassAST>(new_class);
     }
     else {
         throw SyntaxError("Invalid class definition");
     }
 
-    if (typename_cache.find(name) != typename_cache.end()) {
+    if (typename_cache.find(name.to_string()) != typename_cache.end()) {
         throw SyntaxError("Class has already defined: " + name);
     }
 
@@ -557,14 +559,14 @@ ClassAST * RDParser::parse_class_decl() {
     }
 
     // add into symbol table
-    typename_cache.insert(name);
+    typename_cache.insert(name.to_string());
 }
 
 
 Constant* RDParser::parse_value(const RawValue& rawval) {
 
     if (rawval.type != RawValue::STRING) {
-        const char* vstr = rawval.strval.c_str();
+        const char* vstr = rawval.strval.to_cstr();
         char* end;
 
         if (rawval.type == RawValue::BOOL) {
@@ -573,7 +575,7 @@ Constant* RDParser::parse_value(const RawValue& rawval) {
         }
 
         else if (rawval.type == RawValue::CHAR) {
-            char val = rawval.strval[0];
+            char val = vstr[0];
             return new Constant(new PrimitiveType(Type::INT), (char*)&val, sizeof(val));
         }
 
@@ -593,7 +595,7 @@ Constant* RDParser::parse_value(const RawValue& rawval) {
     else {
         return new Constant(
             static_cast<Type*>(new PointerType(new PrimitiveType(Type::CHAR))),
-            rawval.strval.c_str(), rawval.strval.length());
+            rawval.strval.to_cstr(), rawval.strval.length());
     }
 
 }

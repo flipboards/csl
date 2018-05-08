@@ -16,19 +16,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="lexer.cpp">
-      <Filter>csl</Filter>
-    </ClCompile>
     <ClCompile Include="test\main.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\test_lexer.h">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="rdparser.cpp">
+    <ClCompile Include="logger.cpp">
       <Filter>csl</Filter>
     </ClCompile>
-    <ClCompile Include="logger.cpp">
+    <ClCompile Include="lexer.cpp">
       <Filter>csl</Filter>
     </ClCompile>
   </ItemGroup>
@@ -40,9 +37,6 @@
       <Filter>grammar</Filter>
     </ClInclude>
     <ClInclude Include="token.h">
-      <Filter>csl</Filter>
-    </ClInclude>
-    <ClInclude Include="value.h">
       <Filter>csl</Filter>
     </ClInclude>
     <ClInclude Include="util\ioutil.h">
@@ -71,6 +65,18 @@
     </ClInclude>
     <ClInclude Include="logger.h">
       <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="util\memory.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="test\test_mempool.h">
+      <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="util\strmap.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="test\test_strmap.h">
+      <Filter>test</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

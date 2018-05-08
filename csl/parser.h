@@ -2,14 +2,16 @@
 #ifndef CSL_PARSER_H
 #define CSL_PARSER_H
 
+#include <string>
+#include <map>
+#include <unordered_set>
+
+#include "util/memory.h"
 #include "token.h"
 #include "lexer.h"
 #include "ast.h"
 #include "value.h"
 
-#include <string>
-#include <map>
-#include <unordered_set>
 
 // Parser using recursive descent algorithm
 class RDParser {
@@ -30,9 +32,9 @@ public:
         _lexer.clear();
     }
 
-    ASTBase* parse_file(const std::string& filename);
+    ASTRef parse_file(const std::string& filename);
 
-    ASTBase* parse_string(const std::string& str);
+    StmtASTRef parse_string(const std::string& str);
 
     const Lexer& get_lexer()const {
         return _lexer;
@@ -40,27 +42,27 @@ public:
 
 private:
     
-    ExprAST* parse_simple_expr();
+    ExprASTRef parse_simple_expr();
 
-    ExprAST* parse_unary_expr();
+    ExprASTRef parse_unary_expr();
 
-    ExprAST* parse_expr();	
+    ExprASTRef parse_expr();	
 
-    TypeAST* parse_type_base(StringRef);
+    TypeASTRef parse_type_base(const StringRef&);
 
-    TypeAST* parse_type();
+    TypeASTRef parse_type();
 
-    std::vector<VarDeclAST*> parse_var_decl();
+    std::vector<VarDeclASTRef> parse_var_decl();
 
-    ExprAST* parse_initializer();
+    ExprASTRef parse_initializer();
 
-    StmtAST* parse_stmt();
+    StmtASTRef parse_stmt();
 
-    BlockStmtAST* parse_block_stmt();
+    BlockStmtASTRef parse_block_stmt();
 
-    FunctionAST* parse_function_decl();
+    FunctionASTRef parse_function_decl();
 
-    ClassAST* parse_class_decl();
+    ClassASTRef parse_class_decl();
 
     Constant* parse_value(const RawValue&);
 
@@ -83,10 +85,24 @@ private:
 
     void match_required_symbol(OpName, char);
 
-    static std::map<std::string, ASTBase*> ast_cache; // global cache for import different files
-    static std::unordered_set<StringRef> typename_cache; // defined classes
+    template<typename Ty>
+    ConstMemoryRef<Ty> store_ast(const Ty* ptr) {
+        return _astpool->collect<Ty>(ptr).to_const();
+    }
+
+    TypeRef store_type(const Type* ptr) {
+        return _typepool->collect<Type>(ptr).to_const();
+    }
+
+    /* StringRef is only used for intermediate representation; For searching, std::string is used */
+
+    static std::map<std::string, ASTRef> ast_cache;         // global cache for import different files
+    static std::unordered_set<std::string> typename_cache;  // defined classes
 
     Token cur_token, next_token, next_look_token;
+    ConstStringPool* _strpool;
+    MemoryPool* _astpool;
+    MemoryPool* _typepool;
 
     Lexer _lexer;
 

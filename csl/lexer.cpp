@@ -2,6 +2,7 @@
 #include <cassert>
 #include <regex>
 
+#include "token.h"
 #include "lexer.h"
 #include "util/errors.h"
 #include "util/strutil.h"
@@ -16,14 +17,14 @@ std::regex Lexer::re_ws("[ \\t\\n]+");
 
 std::regex re_single_char("'\\\\?.'");
 
-std::unordered_map<std::string, Keyword> Lexer::keyword_loc {
+StrMap<Keyword> Lexer::keyword_loc {
     {"if", Keyword::IF}, {"else", Keyword::ELSE}, {"while", Keyword::ELSE}, 
     {"for", Keyword::FOR}, {"break", Keyword::BREAK}, {"continue", Keyword::CONTINUE}, 
     {"return", Keyword::RETURN}, {"fn", Keyword::FN}, {"class", Keyword::CLASS}, 
     {"import", Keyword::IMPORT}
 };
 
-std::unordered_map<std::string, OpName> Lexer::op_loc {
+StrMap<OpName> Lexer::op_loc {
     {"+", OpName::ADD}, {"-", OpName::SUB}, {"*", OpName::MUL}, {"/", OpName::DIV}, {"%", OpName::MOD}, {"^", OpName::POW},
     {"++", OpName::INC}, {"--", OpName::DEC}, {"==", OpName::EQ}, {"!=", OpName::NE}, {"<", OpName::LT}, {"<=", OpName::LE}, 
     {">", OpName::GT}, {">=", OpName::GE}, {"and", OpName::AND}, {"or", OpName::OR}, {"xor", OpName::XOR}, {"not", OpName::NOT},
@@ -92,15 +93,15 @@ Token Lexer::_fetch_token() {
 
     else if (match(re_char)) {
 
-        RawValue::Type vtype = std::regex_match(token_str, re_single_char) ? RawValue::STRING : RawValue::CHAR;
+        RawValue::Type vtype = std::regex_match(token_str.copy(), re_single_char) ? RawValue::STRING : RawValue::CHAR;
 
         Token token(Token::VALUE);
-        token.set_value(vtype, token_str.substr(1, token_str.length() - 2));
+        token.set_value(vtype, make_ref(token_str.substr(1, token_str.length() - 2)));
         return token;
     }
     else if (match(re_str)) {
         Token token(Token::VALUE);
-        token.set_value(RawValue::STRING, token_str.substr(1, token_str.length() - 2));
+        token.set_value(RawValue::STRING, make_ref(token_str.substr(1, token_str.length() - 2)));
         return token;
     }
     else if (match(re_op)) {
@@ -108,19 +109,19 @@ Token Lexer::_fetch_token() {
     }
     else if (match(re_float)) {
         Token token(Token::VALUE);
-        token.set_value(RawValue::FLOAT, token_str);
+        token.set_value(RawValue::FLOAT, make_ref(token_str.copy()));
         return token;
     }
     else if (match(re_int)) {
         Token token(Token::VALUE);
-        token.set_value(RawValue::INT, token_str);
+        token.set_value(RawValue::INT, make_ref(token_str.copy()));
         return token;
     }
     else if (match(re_id)) {
 
         if (token_str == "true" || token_str == "false") {
             Token token(Token::VALUE);
-            token.set_value(RawValue::BOOL, token_str);
+            token.set_value(RawValue::BOOL, make_ref(token_str.copy()));
             return token;
         }
 
@@ -131,7 +132,7 @@ Token Lexer::_fetch_token() {
 
         auto find_result = keyword_loc.find(token_str);
         if (find_result == keyword_loc.end()) {
-            return Token(Token::ID, token_str);
+            return Token(Token::ID, make_ref(token_str.copy()));
         }
         else {
             return Token(Token::KEYWORD, static_cast<unsigned>(find_result->second));
@@ -148,11 +149,16 @@ Token Lexer::_fetch_token() {
 bool Lexer::match(const std::regex& re) {
     std::smatch match_result;
     if (std::regex_search(_reader->iter(), _reader->end(), match_result, re, std::regex_constants::match_continuous)) {
-        token_str = match_result[0].str();
+        token_str = StringTmpRef(&*match_result[0].first, &*match_result[0].first + match_result[0].length());
         _reader->forward(match_result[0].length());
         return true;
     }
     else {
         return false;
     }
+}
+
+StringRef Lexer::make_ref(const std::string & str)
+{
+    return _strpool->assign(str);
 }

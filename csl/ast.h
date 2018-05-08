@@ -2,39 +2,47 @@
 #ifndef CSL_AST_H
 #define CSL_AST_H
 
-#include "operator.h"
-#include "type.h"
-#include "value.h"
 
 #include <vector>
 #include <string>
 #include <ostream>
-#include <string.h>
+#include <cstring>
 
-typedef const Type* TypeRef;
-typedef std::string StringRef;
+#include "util/memory.h"
+#include "operator.h"
+#include "type.h"
+#include "value.h"
+
 
 
 class ASTBase {
 public:
     
     enum ASTType {
-        NONE = 0x0, // default
-        VALUE = 0x1,// terminal: value
-        ID = 0x2,	// terminal: id
-        TYPE = 0x3,	// terminal: type
-        OP = 0x4,	// operator
-        CALL = 0x5,	// function call
-        LIST = 0x6,	// initialization list
-        EXPR = 0x7,	// general expression
-        CTRL = 0x8,	// control
-        BLOCK = 0x9,// block of statements
-        DECL = 0xa,	// declaration
-        FN = 0xb,	// function definition
-        ROOT = 0xc	// root
+        NONE = 0, // default
+        /* Expressions */
+        OP = 1,
+        VALUE = 2,
+        ID = 3,
+        CALL = 4,
+        LIST = 5,
+        /* Declarations */
+        DECL = 6,
+        FUNCTION = 7,
+        CLASS = 8,
+        /* Type */
+        TYPE = 9,
+        /* Statements */
+        BLOCK = 0x10,
+        IF = 0x11,
+        WHILE = 0x12,
+        FOR = 0x13,
+        CONTINUE = 0x14,
+        BREAK = 0x15,
+        RETURN = 0x16
     };
 
-    ASTBase() {
+    ASTBase() : mytype(NONE) {
 
     }
 
@@ -46,12 +54,32 @@ public:
 
     }
 
+    bool is_stmt()const {
+        return mytype >= OP && mytype < DECL || mytype >= BLOCK;
+    }
+
+    bool is_expr()const {
+        return mytype >= OP && mytype < DECL;
+    }
+
+    bool is_decl()const {
+        return mytype >= DECL && mytype < TYPE;
+    }
+
+    bool is_type()const {
+        return mytype == TYPE;
+    }
+
     bool is_id()const {
         return mytype == ID;
     }
 
-    /* Notice: When destructing, only delete member that is also AST;
-        But left other types (StringRef, TypeRef)
+    bool is_control()const {
+        return mytype >= IF;
+    }
+
+    /*  Notice: CSL Member class (AST, Token, ...) will not release *ANY* pointers
+        it holds. Please use references in MemoryPool.
     */
     virtual ~ASTBase() {
 
@@ -62,21 +90,41 @@ protected:
     ASTType mytype;
 };
 
+typedef ConstMemoryRef<ASTBase> ASTRef;
 
+
+// General Statement
 class StmtAST : public ASTBase {
+public:
 
+    StmtAST() {
+
+    }
+
+    explicit StmtAST(ASTType type) : ASTBase(type) {
+
+    }
 };
 
+typedef ConstMemoryRef<StmtAST> StmtASTRef;
 
-// EXPR (7)
+// General Expression
 class ExprAST : public StmtAST {
 public:
+
+    ExprAST() {
+
+    }
+
+    explicit ExprAST(ASTType type) : StmtAST(type) {
+
+    }
 
     virtual void print(std::ostream&, char indent='\t', int level = 0)const {
 
     }
 
-    virtual void add_child(ExprAST* child) {
+    virtual void add_child(const ConstMemoryRef<ExprAST>& child) {
 
     }
 
@@ -84,34 +132,31 @@ private:
 
 };
 
-// OP (4)
+typedef ConstMemoryRef<ExprAST> ExprASTRef;
+
+// Operator (1)
 class OpAST : public ExprAST {
 public:
 
-    OpAST() : _lhs(nullptr), _rhs(nullptr) {
+    OpAST() : ExprAST(OP), lhs(nullptr), rhs(nullptr) {
 
     }
 
-    OpAST(Operator op) : _op(op), _lhs(nullptr), _rhs(nullptr) {
+    explicit OpAST(Operator op) : op(op), lhs(nullptr), rhs(nullptr) {
 
     }
 
-    OpAST(Operator op, ExprAST* lhs, ExprAST* rhs) : _op(op),
-        _lhs(lhs), _rhs(rhs) {
+    explicit OpAST(Operator op, const ExprASTRef& lhs, const ExprASTRef& rhs) : op(op),
+        lhs(lhs), rhs(rhs) {
 
     }
 
-    ~OpAST() {
-        delete _lhs;
-        delete _rhs;
-    }
-
-    void add_child(ExprAST* child) {
-        if (!_lhs) {
-            _lhs = child;
+    void add_child(const ExprASTRef& child) {
+        if (!lhs) {
+            lhs = child;
         }
-        else if (!_rhs) {
-            _rhs = child;
+        else if (!rhs) {
+            rhs = child;
         }
         else {
             throw std::out_of_range("OpAST already full");
@@ -119,37 +164,37 @@ public:
     }
 
     void print(std::ostream& os, char indent='\t', int level=0)const {
-        for (int i = 0; i < level; i++) os << indent;
+        os << std::string(level, indent);
 
-        print_op(_op, os);
+        print_op(op, os);
         os << std::endl;
-        _lhs->print(os, indent, level + 1);
-        if (_rhs) _rhs->print(os, indent, level + 1);
+        lhs->print(os, indent, level + 1);
+        if (rhs.exists()) rhs->print(os, indent, level + 1);
     }
 
 private:
 
-    Operator _op;
-    ExprAST * _lhs, * _rhs;
+    Operator op;
+    ExprASTRef lhs, rhs;
 };
 
-// VALUE (1)
+// VALUE (2)
 class ValueAST : public ExprAST {
 public:
 
-    ValueAST() {
+    ValueAST() : ExprAST(VALUE), data(nullptr) {
 
     }
 
-    ValueAST(const Constant* c) : data(c) {
+    explicit ValueAST(const ConstMemoryRef<Constant>& c) : data(c) {
     }
 
-    void add_child(ExprAST*) {
+    void add_child(const ExprASTRef&) {
         throw std::out_of_range("Cannot add child to identifier");
     }
 
     void print(std::ostream& os, char indent = '\t', int level = 0)const {
-        for (int i = 0; i < level; i++) os << indent;
+        os << std::string(level, indent);
 
         data->get_type()->print(os);
         os << ' ';
@@ -176,29 +221,29 @@ public:
 
 private:
 
-    const Constant* data;
+    const ConstMemoryRef<Constant> data;
 
 };
 
-// ID (2)
+// ID (3)
 class IdAST : public ExprAST {
 public:
-    IdAST() {
+    IdAST() : ExprAST(ID) {
 
     }
 
-    IdAST(const StringRef& name) : name(name) {
+    explicit IdAST(const StringRef& name) : name(name) {
 
     }
 
-    void add_child(ExprAST*) {
+    void add_child(const ExprASTRef&) {
         throw std::out_of_range("Cannot add child to identifier");
     }
 
     void print(std::ostream& os, char indent = '\t', int level = 0)const {
-        for (int i = 0; i < level; i++) os << indent;
+        os << std::string(level, indent);
 
-        os << "id " << name << std::endl;
+        os << "id " << name.to_cstr() << std::endl;
     }
 
     StringRef get_name()const {
@@ -210,24 +255,25 @@ private:
     StringRef name;
 };
 
-// CALL (5)
+// CALL (4)
 class CallAST : public ExprAST {
 public:
 
-    CallAST() : callee(nullptr) {
+    CallAST() : ExprAST(CALL), callee(nullptr) {
 
     }
 
     ~CallAST() {
-        for (const ExprAST* arg : argv) {
-            delete arg;
-        }
-        delete callee;
     }
 
-    void add_child(ExprAST* child) {
+    void add_child(const ExprASTRef& child) {
         if (!callee) {
-            callee = static_cast<IdAST*>(child);
+            if (child->is_id()) {
+                callee = child.cast<IdAST>();
+            }
+            else {
+                throw std::runtime_error("Not an id");
+            }
         }
         else {
             argv.push_back(child);
@@ -235,48 +281,60 @@ public:
     }
 
     void print(std::ostream& os, char indent = '\t', int level = 0)const {
-        for (int i = 0; i < level; i++) os << indent;
+        os << std::string(level, indent) << std::endl;
 
         os << "function call" << std::endl;
         callee->print(os, indent, level + 1);
-        for (const ExprAST* arg : argv) {
+        for (const auto& arg : argv) {
             arg->print(os, indent, level+1);
         }
     }
 
 private:
-    IdAST * callee;
-    std::vector<ExprAST*> argv;
+    ConstMemoryRef<IdAST> callee;
+    std::vector<ExprASTRef> argv;
 };
 
-// LIST (6)
+// LIST (5)
 class ListAST : public ExprAST {
 public:
 
-    void add_child(ExprAST* child) {
+    ListAST() : ExprAST(LIST) {
+
+    }
+
+    void add_child(const ExprASTRef& child) {
         member.push_back(child);
     }
 
     void print(std::ostream& os, char indent = '\t', int level = 0)const {
-        for (int i = 0; i < level; i++) os << indent;
+        os << std::string(level, indent);
 
         os << "initialization list" << std::endl;
-        for (const ExprAST* m : member) {
+        for (const auto& m : member) {
             m->print(os, indent, level + 1);
         }
     }
 
 private:
 
-    std::vector<ExprAST*> member;
+    std::vector<ExprASTRef> member;
 };
 
 // Declaration of function/class/variable
-class DeclAST : ASTBase {
+class DeclAST : public ASTBase {
+public:
 
+    DeclAST() {
+
+    }
+
+    DeclAST(ASTType type) : ASTBase(type) {
+
+    }
 };
 
-
+// TYPE(9)
 class TypeAST : public ASTBase {
 public:
 
@@ -287,191 +345,239 @@ public:
         CLASS
     };
 
-    struct ClassChild {
-        StringRef name;
-    };
-
-    TypeAST() {
+    TypeAST() : ASTBase(TYPE) {
 
     }
 
-    explicit TypeAST(Type* type) : relation(NONE), child(type) {
+    explicit TypeAST(const TypeRef& type) : relation(NONE), child(type.cast<void>()) {
 
     }
 
-    explicit TypeAST(TypeAST* pointee) : relation(POINTER), child(pointee) {
+    explicit TypeAST(const ConstMemoryRef<TypeAST>& pointee) : relation(POINTER), child(pointee.cast<void>()) {
 
     }
 
-    explicit TypeAST(const StringRef& classname) : relation(CLASS), child(new ClassChild{ classname }) {
+    explicit TypeAST(const StringRef& classname) : relation(CLASS), child(classname.to_memref().cast<void>()) {
 
     }
 
     ~TypeAST() {
-        if (is_class_type()) {
-            delete child;
-        }
+
     }
 
     RelationToChild get_relation()const {
         return relation;
     }
 
-    TypeAST* get_pointee()const {
+    ConstMemoryRef<TypeAST> get_pointee()const {
         assert(relation == POINTER && "Is not pointer");
-        return reinterpret_cast<TypeAST*>(child);
+        return child.cast<TypeAST>();
     }
 
-    Type* get_type()const {
+    TypeRef get_type()const {
         assert(relation == NONE && "Is not primitive type");
-        return reinterpret_cast<Type*>(child);
+        return child.cast<Type>();
     }
 
-    bool is_primitive_type() {
+    bool is_primitive_type()const {
         return relation == NONE;
     }
 
-    bool is_array_type() {
+    bool is_pointer_type()const {
+        return relation == POINTER;
+    }
+
+    bool is_array_type()const {
         return relation == ARRAY;
     }
 
-    bool is_class_type() {
+    bool is_class_type()const {
         return relation == CLASS;
     }
+
+    virtual void print(std::ostream& os, char indent = '\t', int level = 0)const {
+
+        os << std::string(level, indent);
+
+
+        switch (relation)
+        {
+        case TypeAST::NONE:
+            child.cast<Type>()->print(os);
+            os << std::endl;
+            break;
+        case TypeAST::POINTER:
+            os << "[Pointer of]" << std::endl;
+            child.cast<TypeAST>()->print(os, indent, level + 1);
+            break;
+        case TypeAST::CLASS:
+            os << "Custom type: " << child.cast<char>().get() << std::endl;
+            break;
+        default:
+            break;
+        }
+    }
+
 
 protected:
     
     RelationToChild relation;
-    void * child;
+    ConstMemoryRef<void> child;
 };
+
+typedef ConstMemoryRef<TypeAST> TypeASTRef;
 
 
 class ArrayTypeAST : public TypeAST {
 public:
 
-    ArrayTypeAST() {
+    ArrayTypeAST() : TypeAST() {
 
     }
 
-    ArrayTypeAST(TypeAST* typee, ExprAST* expr_size) : TypeAST(typee), expr_size(expr_size) {
+    ArrayTypeAST(const TypeASTRef& typee, const ExprASTRef& expr_size) : TypeAST(typee), expr_size(expr_size) {
 
     }
 
+    void print(std::ostream& os, char indent = '\t', int level = 0)const {
+        os << std::string(level, indent);
+        os << "[Array type]" << std::endl;
+        child.cast<TypeAST>()->print(os, indent, level + 1);
+        expr_size->print(os, indent, level + 1);
+    }
 private:
 
-    ExprAST * expr_size;
+    ExprASTRef expr_size;
 };
 
 
 // Variable declaration
-class VarDeclAST : DeclAST {
+class VarDeclAST : public DeclAST {
 public:
 
-    VarDeclAST() : vartype(nullptr), initializer(nullptr) {
+    VarDeclAST() : DeclAST(DECL), vartype(nullptr), initializer(nullptr) {
 
     }
 
-    VarDeclAST(TypeAST* type, StringRef name) : vartype(type), varname(name) {
+    explicit VarDeclAST(const TypeASTRef& type, const StringRef& name) : vartype(type), varname(name) {
 
     }
 
-    VarDeclAST(TypeAST* type, StringRef name, ExprAST* initializer) :
+    explicit VarDeclAST(const TypeASTRef& type, const StringRef& name, const ExprASTRef& initializer) :
         vartype(type), varname(name), initializer(initializer) {
 
     }
 
     ~VarDeclAST() {
-        delete initializer;
     }
 
+    void print(std::ostream& os, char indent = '\t', int level = 0)const {
+        os << std::string(level, indent) << std::endl;
+        os << "Declaration of name: " << varname.to_cstr() << std::endl;
+        vartype->print(os, indent, level + 1);
+        if (initializer.exists()) {
+            initializer->print(os, indent, level + 1);
+        }
+    }
+
+
 private:
-    TypeAST* vartype;
+    TypeASTRef vartype;
     StringRef varname;
-    ExprAST * initializer;
+    ExprASTRef initializer;
 };
 
+typedef typename ConstMemoryRef<VarDeclAST> VarDeclASTRef;
 
 
 class BlockStmtAST : public StmtAST {
 public:
 
-    BlockStmtAST() {
+    BlockStmtAST() : StmtAST(BLOCK) {
 
     }
 
-    void append(VarDeclAST* d) {
+    void append(const ConstMemoryRef<VarDeclAST>& d) {
         decl_list.push_back(d);
     }
 
-    void append(StmtAST* d) {
+    void append(const StmtASTRef& d) {
         stmt_list.push_back(d);
+    }
+
+    void print(std::ostream& os, char indent='\t', unsigned level=0) {
+        os << std::string(level, indent) << "[Block]" << std::endl;
+        for (const auto& d : decl_list) {
+            d->print(os, indent, level + 1);
+        }
+        for (const auto& s : stmt_list) {
+            s->print(os, indent, level + 1);
+        }
     }
 
 private:
 
-    std::vector<VarDeclAST*> decl_list;
-    std::vector<StmtAST*> stmt_list;
+    std::vector<ConstMemoryRef<VarDeclAST> > decl_list;
+    std::vector<StmtASTRef> stmt_list;
 };
 
-class ControlAST : public StmtAST {
-public:
-};
+typedef typename ConstMemoryRef<BlockStmtAST> BlockStmtASTRef;
 
-
-class IfAST : public ControlAST {
+class IfAST : public StmtAST {
 
 public:
 
-    IfAST() : ControlAST(), condition(nullptr), true_stmt(nullptr), false_stmt(nullptr) {
+    IfAST() : StmtAST(IF), condition(nullptr), true_stmt(nullptr), false_stmt(nullptr) {
 
     }
 
-    IfAST(ExprAST* expr_cond, StmtAST* true_stmt) :
+    explicit IfAST(const ExprASTRef& expr_cond, const StmtASTRef& true_stmt) :
         condition(expr_cond), true_stmt(true_stmt), false_stmt(nullptr) {
 
     }
 
-    IfAST(ExprAST* expr_cond, StmtAST* true_stmt, StmtAST* false_stmt) :
+    explicit IfAST(const ExprASTRef& expr_cond, const StmtASTRef& true_stmt, const StmtASTRef& false_stmt) :
         condition(expr_cond), true_stmt(true_stmt), false_stmt(false_stmt) {
 
     }
 
 private:
-    ExprAST * condition;
-    StmtAST* true_stmt;
-    StmtAST* false_stmt;
+    ExprASTRef condition;
+    StmtASTRef true_stmt;
+    StmtASTRef false_stmt;
 };
 
 
-class WhileAST : public ControlAST {
+class WhileAST : public StmtAST {
 public:
 
-    WhileAST() : condition(nullptr), loop_stmt(nullptr) {
+    WhileAST() : StmtAST(WHILE), condition(nullptr), loop_stmt(nullptr) {
 
     }
 
-    WhileAST(ExprAST* expr_cond, StmtAST* stmt) :
+    explicit WhileAST(const ExprASTRef& expr_cond, const StmtASTRef& stmt) :
         condition(expr_cond), loop_stmt(stmt) {
 
     }
 
 private:
-    ExprAST * condition;
-    StmtAST* loop_stmt;
+    ExprASTRef condition;
+    StmtASTRef loop_stmt;
 };
 
 
-class ForAST : public ControlAST {
+class ForAST : public StmtAST {
 public:
 
-    ForAST() : init_expr(nullptr),
+    ForAST() : StmtAST(FOR), init_expr(nullptr),
         condition(nullptr),
         loop_expr(nullptr),
         loop_stmt(nullptr) {
 
     }
 
-    explicit ForAST(ExprAST* init_expr, ExprAST* cond_expr, ExprAST* loop_expr, StmtAST* loop_stmt) :
+    explicit ForAST(const ExprASTRef& init_expr, const ExprASTRef& cond_expr, const ExprASTRef& loop_expr, 
+        const StmtASTRef& loop_stmt) :
         init_expr(init_expr),
         condition(cond_expr),
         loop_expr(loop_expr),
@@ -481,105 +587,115 @@ public:
 
 
 private:
-    ExprAST * init_expr;
-    ExprAST * condition;
-    ExprAST * loop_expr;
-    StmtAST * loop_stmt;
+    ExprASTRef init_expr;
+    ExprASTRef condition;
+    ExprASTRef loop_expr;
+    StmtASTRef loop_stmt;
 };
 
-class ContinueAST : public ControlAST {
+class ContinueAST : public StmtAST {
 public:
 
-private:
-};
-
-
-class BreakAST : public ControlAST {
-public:
-
-private:
-};
-
-class ReturnAST : public ControlAST {
-public:
-
-    ReturnAST() : ret_expr(nullptr) {
+    ContinueAST() : StmtAST(CONTINUE) {
 
     }
 
-    ReturnAST(ExprAST* ret_expr) : ret_expr(ret_expr) {
+};
+
+
+class BreakAST : public StmtAST {
+public:
+    BreakAST() : StmtAST(BREAK) {
+
+    }
+};
+
+class ReturnAST : public StmtAST {
+public:
+
+    ReturnAST() : StmtAST(RETURN), ret_expr(nullptr) {
+
+    }
+
+    explicit ReturnAST(const ExprASTRef& ret_expr) : ret_expr(ret_expr) {
 
     }
 
 private:
 
-    ExprAST * ret_expr;
+    ExprASTRef ret_expr;
 };
 
+/* FUNCTION(7) */
 class FunctionAST : public DeclAST {
 public:
 
-    FunctionAST() : ret_type(nullptr), body(nullptr) {
+    FunctionAST() : DeclAST(FUNCTION), ret_type(nullptr), body(nullptr) {
 
     }
 
-    explicit FunctionAST(StringRef name) : name(name), ret_type(nullptr), body(nullptr) {
+    explicit FunctionAST(const StringRef& name) : name(name), ret_type(nullptr), body(nullptr) {
 
     }
 
-    void add_argument(TypeAST* type) {
+    void add_argument(const TypeASTRef& type) {
         arg_types.push_back(type);
-        arg_names.push_back(StringRef());
+        arg_names.push_back(StringRef::null());
     }
 
-    void add_argument(TypeAST* type, StringRef name) {
+    void add_argument(const TypeASTRef& type, const StringRef& name) {
         arg_types.push_back(type);
         arg_names.push_back(name);
     }
 
-    void set_return_type(TypeAST* type) {
+    void set_return_type(const TypeASTRef& type) {
         ret_type = type;
     }
 
-    void set_body_ast(BlockStmtAST* body_ast) {
+    void set_body_ast(const BlockStmtASTRef& body_ast) {
         body = body_ast;
     }
 
 private:
     StringRef name;
-    std::vector<TypeAST*> arg_types;
+    std::vector<TypeASTRef> arg_types;
     std::vector<StringRef> arg_names;
-    TypeAST* ret_type;
+    TypeASTRef ret_type;
 
-    BlockStmtAST* body;
+    BlockStmtASTRef body;
 };
 
+typedef typename ConstMemoryRef<FunctionAST> FunctionASTRef;
 
+
+// CLASS (8)
 class ClassAST : public DeclAST {
 public:
 
-    ClassAST() : DeclAST() {
+    ClassAST() : DeclAST(CLASS) {
 
     }
 
-    ClassAST(StringRef name) : name(name) {
+    explicit ClassAST(const StringRef& name) : name(name) {
 
     }
 
-    void add_member(VarDeclAST* ast_member) {
+    void add_member(const VarDeclASTRef& ast_member) {
         ast_members.push_back(ast_member);
     }
 
-    void add_method(FunctionAST* ast_method) {
+    void add_method(const FunctionASTRef& ast_method) {
         ast_methods.push_back(ast_method);
     }
 
 private:
 
     StringRef name;
-    std::vector<VarDeclAST*> ast_members;
-    std::vector<FunctionAST*> ast_methods;
+    std::vector<VarDeclASTRef> ast_members;
+    std::vector<FunctionASTRef> ast_methods;
 
 };
+
+typedef typename ConstMemoryRef<ClassAST> ClassASTRef;
 
 #endif // !CSL_AST_H

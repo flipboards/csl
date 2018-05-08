@@ -133,7 +133,7 @@ class Function : public GlobalValue {
 
 };
 
-class MemoryRef : public Value {
+class MemoryEntry : public Value {
 
 };
 

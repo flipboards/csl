@@ -3,8 +3,10 @@
 #ifndef CSL_LEXER_H
 #define CSL_LEXER_H
 
-#include "token.h"
 #include "util/ioutil.h"
+#include "util/memory.h"
+#include "util/strmap.h"
+#include "token.h"
 
 #include <string>
 #include <regex>
@@ -19,12 +21,14 @@ public:
 
     ~Lexer() {
         _reader = nullptr;
+        _strpool = nullptr;
     }
 
     void clear();
 
-    void load(StrReader* reader) {
+    void load(StrReader* reader, ConstStringPool* strpool) {
         _reader = reader;
+        _strpool = strpool;
     }
 
     Token get_token();
@@ -49,6 +53,8 @@ private:
 
     bool match(const std::regex&);
 
+    StringRef make_ref(const std::string&);
+
     static std::regex re_ws;
     static std::regex re_op;
     static std::regex re_int;
@@ -56,12 +62,13 @@ private:
     static std::regex re_id;
     static std::regex re_str;
     static std::regex re_char;
-    static std::unordered_map<std::string, OpName> op_loc;
-    static std::unordered_map<std::string, Keyword> keyword_loc;
+    static StrMap<OpName> op_loc;
+    static StrMap<Keyword> keyword_loc;
 
     StrReader* _reader;
+    ConstStringPool* _strpool;
     std::deque<Token> token_buf;
-    std::string token_str;
+    StringTmpRef token_str;
     size_t next_get_pos;
     size_t next_look_pos;
 };

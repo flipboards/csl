@@ -6,9 +6,12 @@
 #include <cassert>
 #include <string>
 
+#include "util/memory.h"
+
 #ifdef EOF
 #undef EOF
 
+/* Keywords used in lexer */
 enum class Keyword : unsigned {
 	// control
 	IF = 0x01, 
@@ -24,6 +27,7 @@ enum class Keyword : unsigned {
 	IMPORT = 0x12
 };
 
+/* Operator name used in lexer */
 enum class OpName : unsigned {
     ADD = 0x01,
     SUB = 0x02,
@@ -70,6 +74,7 @@ enum class OpName : unsigned {
 	RCOMP = 0x44
 };
 
+/* Stores an uncasted value (in string form) */
 struct RawValue {
 	enum Type {
 		BOOL=0x02,
@@ -80,24 +85,38 @@ struct RawValue {
 	};
 
 	Type type;
-	std::string strval;
+    StringRef strval;
 };
 
+/* TOKEN used in lexer */
 class Token {
 public:
 
+    /* Basic type of Token*/
 	enum TokenType {
-		NONE = 0, VALUE, ID, OP, KEYWORD, EOF
+		NONE = 0,   // Uninitialized, for error
+        VALUE,      // Direct value (int/string), stored in string form
+        ID,         // ID
+        OP,         // Operator and other symbols
+        KEYWORD,    // Keywords defined in enum Keyword
+        EOF         // End of file
 	};
 
 	Token() : _type(NONE) {
 	}
-	Token(TokenType type) : _type(type) {
+	explicit Token(TokenType type) : _type(type) {
 	}
-	Token(TokenType type, const std::string& str) : _type(type) {
+
+    /* Only for type == ID */
+	explicit Token(TokenType type, const StringRef& str) : _type(type) {
 		set_name(str);
 	}
-	Token(TokenType type, unsigned data) : _type(type), _uintdata(data) {
+
+    explicit Token(TokenType type, const RawValue& value) {
+        set_value(value.type, value.strval);
+    }
+
+	explicit Token(TokenType type, unsigned data) : _type(type), _uintdata(data) {
 	}
 
 	Token(const Token& token) : _type(token._type), _uintdata(token._uintdata) {
@@ -141,34 +160,35 @@ public:
 		return static_cast<OpName>(_uintdata);
 	}
 
-	const std::string get_name()const {
+	StringRef get_name()const {
 		assert(_type == ID && "Cannot get name from non-id");
 		return _strdata;
 	}
 
-	void set_name(const std::string& name) {
+    // set name to an ID-token
+	void set_name(const StringRef& name) {
 		assert(_type == ID && "Cannot set name to non-id");
 		_strdata = name;
 	}
 
-	// set value of Token. Only used when type is VALUE
-	void set_value(RawValue::Type type, const std::string& data) {
-		assert(_type == VALUE && "Cannot set value to non-value");
-		_uintdata = static_cast<unsigned>(type);
-		_strdata = data;
-	}
-
-	// 
+	// get value from a VALUE-token
 	RawValue get_value() {
 		assert(_type == VALUE && "Cannot get value to non-value");
 		return { static_cast<RawValue::Type>(_uintdata), _strdata};
 	}
 
+	// set value to a VALUE-token
+	void set_value(RawValue::Type type, const StringRef& data) {
+		assert(_type == VALUE && "Cannot set value to non-value");
+		_uintdata = static_cast<unsigned>(type);
+		_strdata = data;
+	}
+
 private:
 
     TokenType _type;
-	unsigned _uintdata;			// stores op/keyword
-	std::string _strdata;		// stores id/value
+	unsigned _uintdata;		// stores op/keyword
+	StringRef _strdata;		// stores id/value
 };
 
 #endif

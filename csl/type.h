@@ -7,6 +7,9 @@
 #include <vector>
 #include <string>
 
+#include "util/memory.h"
+
+
 // Base of all types
 class Type {
 public:
@@ -69,6 +72,8 @@ protected:
 
 };
 
+typedef ConstMemoryRef<Type> TypeRef;
+
 // basic types (void, bool, char, int, float)
 class PrimitiveType : public Type {
 public:
@@ -108,7 +113,7 @@ public:
 class PointerType : public Type {
 public:
 
-    explicit PointerType(Type* pointee) : Type(Pointer), pointee(pointee) {
+    explicit PointerType(const TypeRef& pointee) : Type(Pointer), pointee(pointee) {
 
     }
 
@@ -118,19 +123,18 @@ public:
     }
 
     ~PointerType() {
-        delete pointee;
     }
 
 private:
 
-    Type * pointee;
+    TypeRef pointee;
 };
 
 
 class ArrayType : public Type {
 public:
 
-    explicit ArrayType(Type* elmtype, unsigned elmnum) : eltype(elmtype), elnum(elmnum) {
+    explicit ArrayType(const TypeRef& elmtype, unsigned elmnum) : eltype(elmtype), elnum(elmnum) {
 
     }
 
@@ -141,12 +145,12 @@ public:
     }
 
     ~ArrayType() {
-        delete eltype;
+
     }
 
 private:
 
-    Type * eltype;
+    TypeRef eltype;
     unsigned elnum;
 };
 
@@ -154,37 +158,23 @@ private:
 class ClassType : public Type {
 public:
 
-    explicit ClassType(const std::string& name, const std::vector<Type*>& eltypes) : 
+    explicit ClassType(const StringRef& name, const std::vector<TypeRef>& eltypes) :
         name(name), eltypes(eltypes) {
 
     }
 
-    void add_element(Type* type) {
+    void add_element(const TypeRef& type) {
         eltypes.push_back(type);
     }
 
     void print(std::ostream& os)const {
-        os << "class" << name;
-    }
-
-    std::vector<Type*>::const_iterator begin() {
-        return eltypes.begin();
-    }
-
-    std::vector<Type*>::const_iterator end() {
-        return eltypes.end();
-    }
-
-    ~ClassType() {
-        for (auto elt : eltypes) {
-            delete elt;
-        }
+        os << "class" << name.to_cstr();
     }
 
 private:
 
-    std::string name;
-    std::vector<Type*> eltypes;
+    StringRef name;
+    std::vector<TypeRef> eltypes;
 };
 
 #endif
