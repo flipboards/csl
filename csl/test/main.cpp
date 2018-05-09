@@ -1,12 +1,12 @@
 #pragma once
 
-#include "test_lexer.h"
+#include "test_parser.h"
 
 int main() {
     
-    LexerTest test;
-    test.test_token();
-    test.test_lexer();
+    ParserTest test;
+    test.test_parse_expr();
+    test.test_parse_decl();
 
     return 0;
 }

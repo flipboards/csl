@@ -28,6 +28,9 @@
     <ClCompile Include="lexer.cpp">
       <Filter>csl</Filter>
     </ClCompile>
+    <ClCompile Include="rdparser.cpp">
+      <Filter>csl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lexer.h">
@@ -54,9 +57,6 @@
     <ClInclude Include="ast.h">
       <Filter>csl</Filter>
     </ClInclude>
-    <ClInclude Include="astbuilder.h">
-      <Filter>csl</Filter>
-    </ClInclude>
     <ClInclude Include="operator.h">
       <Filter>csl</Filter>
     </ClInclude>
@@ -76,6 +76,15 @@
       <Filter>util</Filter>
     </ClInclude>
     <ClInclude Include="test\test_strmap.h">
+      <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="value.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="context.h">
+      <Filter>csl</Filter>
+    </ClInclude>
+    <ClInclude Include="test\test_parser.h">
       <Filter>test</Filter>
     </ClInclude>
   </ItemGroup>

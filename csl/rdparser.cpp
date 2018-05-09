@@ -1,82 +1,108 @@
 
 #include "parser.h"
-#include "astbuilder.h"
 #include "operator.h"
 
 #include "util/errors.h"
 
 
 std::map<std::string, ASTRef> RDParser::ast_cache;
-std::unordered_set<std::string> RDParser::typename_cache = { "void", "bool", "char", "int", "float" };
+StrSet RDParser::typename_cache = { "void", "bool", "char", "int", "float" };
 
-StmtASTRef RDParser::parse_string(const std::string& str) {
+ExprASTRef RDParser::parse_line_expr(const std::string& str) {
 
-    StrReader* reader = new StrReader(str);
-    _lexer.load(reader);
+    StrReader reader(str);
+    this->clear();
+    _lexer.load(&reader, _context);
     eat();
-    auto parse_result = parse_expr();
-    delete reader;
-    return parse_result.cast<StmtAST>();
+    return parse_expr();
+}
+
+BlockStmtASTRef RDParser::parse_string(const std::string & str) {
+    StrReader reader(str);
+    this->clear();
+    _lexer.load(&reader, _context);
+    eat();
+    return parse_block_stmt(true);
 }
 
 
 ExprASTRef RDParser::parse_unary_expr() {
 
-    ExprASTBuilder builder_prefix, builder_postfix;
+    MemoryRef<OpAST> cur_ast_prefix, ast_prefix_ref;
 
     while (1) {
+        OpAST* new_ast;
         if (match_op(OpName::INC) || match_op(OpName::DEC) || match_op(OpName::ADDR)) {
-            builder_prefix.extend_child(new OpAST(static_cast<Operator>(cur_token.get_operator())));
+            new_ast = new OpAST(static_cast<Operator>(cur_token.get_operator()));
         }
         else if (match_op(OpName::ADD)) {
-            builder_prefix.extend_child(new OpAST(Operator::PLUS));
+            new_ast = new OpAST(Operator::PLUS);
         }
         else if (match_op(OpName::SUB)) {
-            builder_prefix.extend_child(new OpAST(Operator::MINUS));
+            new_ast = new OpAST(Operator::MINUS);
         }
         else if (match_op(OpName::NOT)) {
-            builder_prefix.extend_child(new OpAST(Operator::NOT));
+            new_ast = new OpAST(Operator::NOT);
         }
         else if (match_op(OpName::MUL)) {
-            builder_prefix.extend_child(new OpAST(Operator::DEREF));
+            new_ast = new OpAST(Operator::DEREF);
         }
         else {
             break;
         }
+
+        MemoryRef<OpAST> new_ast_ref = store_ast_unconst(new_ast);
+
+        if (!ast_prefix_ref) {
+            cur_ast_prefix = ast_prefix_ref = new_ast_ref;
+        }
+        else {
+            cur_ast_prefix->add_child(new_ast_ref.to_const().cast<ExprAST>());
+            cur_ast_prefix = new_ast_ref;
+        }
     }
+
+    ExprASTRef ast_id_ref;
 
     if (match(Token::ID)) {
         StringRef name = cur_token.get_name();
-        builder_postfix.extend_child(static_cast<ExprAST*>(new IdAST(name)));
+        ast_id_ref = store_ast<ExprAST>(new IdAST(name));
     }
     else if (match(Token::VALUE)) {
-        Constant* c = parse_value(cur_token.get_value());
-        builder_postfix.extend_child(new ValueAST(c));
+        ConstantRef c = parse_value(cur_token.get_value());
+        ast_id_ref = store_ast<ExprAST>(new ValueAST(c));
     }
     else if (match_op(OpName::BRAC)) {
-        builder_postfix.extend_child(parse_expr());
+        ast_id_ref = parse_expr();
         match_required_symbol(OpName::RBRAC, ')');
     }
     else {
         throw SyntaxError("Token with id/value required");
     }
 
+    ExprASTRef ast_postfix_ref = ast_id_ref;
+
     while (1) {
         if (match_op(OpName::INDEX)) {
-            builder_postfix.extend_parent(new OpAST(Operator::INDEX));
-            builder_postfix.add_child(parse_expr());
+            MemoryRef<OpAST> op = store_ast_unconst(new OpAST(Operator::INDEX));
+            op->add_child(ast_postfix_ref);
+            op->add_child(parse_expr());
+            ast_postfix_ref = op.cast<ExprAST>();
             match_required_symbol(OpName::RINDEX, ']');
         }
         else if (match_op(OpName::BRAC)) {
-            if (!builder_postfix.get_ast()->is_id()) {
+            CallAST* call_ast = new CallAST();
+
+            if (ast_postfix_ref->is_id()) {
                 throw SyntaxError("Requires an identifier");
             }
-
-            builder_postfix.extend_parent(new CallAST());
+            else {
+                call_ast->set_callee(ast_postfix_ref.cast<IdAST>());
+            }
 
             if (!match_op(OpName::RBRAC)) {
                 while (1) {
-                    builder_postfix.add_child(parse_expr());
+                    call_ast->add_arg(parse_expr());
                     if (!match_op(OpName::COMMA)) {
                         break;
                     }
@@ -86,31 +112,38 @@ ExprASTRef RDParser::parse_unary_expr() {
                 }
             }
 
+            ast_postfix_ref = store_ast<ExprAST>(call_ast);
         }
         else if (match_op(OpName::MBER) || match_op(OpName::ARROW)) {
-            builder_postfix.extend_parent(new OpAST(static_cast<Operator>(cur_token.get_operator())));
+            OpAST* op = new OpAST(static_cast<Operator>(cur_token.get_operator()));
             if (match(Token::ID)) {
-                builder_postfix.add_child(static_cast<ExprAST*>(new IdAST(cur_token.get_name())));
+                op->add_child(store_ast<ExprAST>(new IdAST(cur_token.get_name())));
             }
             else {
                 throw SyntaxError("Member name required");
             }
+            ast_postfix_ref = store_ast<ExprAST>(op);
         }
         else if (match_op(OpName::INC)) {
-            builder_postfix.extend_parent(new OpAST(Operator::POSTINC));
+            OpAST* op = new OpAST(Operator::POSTINC, ast_postfix_ref);
+            ast_postfix_ref = store_ast<ExprAST>(op);
         }
         else if (match_op(OpName::DEC)) {
-            builder_postfix.extend_parent(new OpAST(Operator::POSTDEC));
+            OpAST* op = new OpAST(Operator::POSTDEC, ast_postfix_ref);
+            ast_postfix_ref = store_ast<ExprAST>(op);
         }
         else {
             break;
         }
     }
 
-    builder_prefix.extend_child(builder_postfix.get_ast());
-
-    return store_ast<ExprAST>(builder_prefix.get_ast());
-
+    if (ast_prefix_ref.exists()) {
+        cur_ast_prefix->add_child(ast_postfix_ref);
+        return ast_prefix_ref.cast<ExprAST>().to_const();
+    }
+    else {
+        return ast_postfix_ref;
+    }
 }
 
 
@@ -129,6 +162,7 @@ ExprASTRef RDParser::parse_simple_expr() {
         if (opname == OpName::RBRAC || opname == OpName::RINDEX) break;
         
         Operator op = static_cast<Operator>(opname);
+        if (!is_valid(op))break;
 
         if (is_assignment(op)) break;
 
@@ -181,7 +215,7 @@ ExprASTRef RDParser::parse_expr() {
     ExprASTRef ast_lhs = parse_simple_expr();
     ExprASTRef ast_ret;
 
-    if (try_match(Token::OP)) {
+    if (try_match(Token::OP) && is_valid(static_cast<Operator>(next_token.get_operator()))) {
         Operator op = static_cast<Operator>(next_token.get_operator());
         if (is_assignment(op)) {
             eat();
@@ -220,7 +254,7 @@ TypeASTRef RDParser::parse_type() {
     TypeASTRef vartype;
 
     if (match(Token::ID)) {
-        if (typename_cache.find(cur_token.get_name().to_string()) == typename_cache.end()) {
+        if (!typename_cache.has_key(cur_token.get_name().to_cstr())) {
             throw SyntaxError("Type undefined: " + cur_token.get_name());
         }
         vartype = parse_type_base(cur_token.get_name());
@@ -256,7 +290,7 @@ std::vector<VarDeclASTRef> RDParser::parse_var_decl() {
     TypeASTRef vartype;
 
     if (match(Token::ID)) {
-        if (typename_cache.find(cur_token.get_name().to_string()) == typename_cache.end()) {
+        if (!typename_cache.has_key(cur_token.get_name().to_cstr())) {
             throw SyntaxError("Type undefined: " + cur_token.get_name());
         }
         vartype = parse_type_base(cur_token.get_name());
@@ -265,32 +299,31 @@ std::vector<VarDeclASTRef> RDParser::parse_var_decl() {
         throw SyntaxError("Type name required");
     }
 
+    while (1) {
+        if (match_op(OpName::MUL)) {
+            vartype = store_ast<TypeAST>(new TypeAST(vartype));
+
+        }
+        else if (match_op(OpName::INDEX)) {
+            ExprASTRef idx_ast;
+            if (!match_op(OpName::RINDEX)) {
+                idx_ast = parse_expr();
+                match_required_symbol(OpName::RINDEX, ']');
+            }
+            vartype = store_ast<TypeAST>(new ArrayTypeAST(vartype, idx_ast));
+        }
+        else {
+            break;
+        }
+    }
+
     std::vector<VarDeclASTRef> decl_ast_list;
 
     while (1) {
 
-        TypeASTRef cur_vartype = vartype;
         StringRef cur_varname;
         VarDeclASTRef decl_ast;
 
-        while (1) {
-            // pointer
-            if (match_op(OpName::MUL)) {
-                cur_vartype = store_ast<TypeAST>(new TypeAST(cur_vartype));
-                
-            }
-            else if (match_op(OpName::INDEX)) {
-                ExprASTRef idx_ast;
-                if (!match_op(OpName::RINDEX)) {
-                    idx_ast = parse_expr();
-                    match_required_symbol(OpName::RINDEX, ']');
-                }
-                cur_vartype = store_ast<TypeAST>(new ArrayTypeAST(cur_vartype, idx_ast));
-            }
-            else {
-                break;
-            }
-        }
 
         if (match(Token::ID)) {
             cur_varname = cur_token.get_name();
@@ -299,17 +332,19 @@ std::vector<VarDeclASTRef> RDParser::parse_var_decl() {
             throw SyntaxError("Identifier required for declaration");
         }
 
-        if (match_op(OpName::COMMA)) {
-            decl_ast_list.push_back(store_ast<VarDeclAST>(new VarDeclAST(cur_vartype, cur_varname)));
-            continue;
+        ExprASTRef initializer;
+        if (match_op(OpName::ASN)) {
+            initializer = parse_initializer();
         }
-        else if (match_op(OpName::ASN)) {
-            ExprASTRef initializer = parse_initializer();
-            decl_ast_list.push_back(store_ast<VarDeclAST>(new VarDeclAST(cur_vartype, cur_varname, initializer)));
+        decl_ast_list.push_back(store_ast<VarDeclAST>(new VarDeclAST(vartype, cur_varname, initializer)));
+
+        if (match_op(OpName::COMMA)) {
+            continue;
         }
         else {
             break;
         }
+
     }
 
     return decl_ast_list;
@@ -399,44 +434,50 @@ StmtASTRef RDParser::parse_stmt(){
 
 }
 
-BlockStmtASTRef RDParser::parse_block_stmt() {
-    match_required_symbol(OpName::COMP, '{');
+BlockStmtASTRef RDParser::parse_block_stmt(bool implicit_bracket) {
+    if (!implicit_bracket) {
+        match_required_symbol(OpName::COMP, '{');
+    }
 
-    BlockStmtAST* ast = new BlockStmtAST();
+    MemoryRef<BlockStmtAST> ast = store_ast_unconst(new BlockStmtAST());
 
     while (1) {
-        if (match_op(OpName::RCOMP)) {
+        if (!implicit_bracket && match_op(OpName::RCOMP)) {
             break;
         }
         else if (match_op(OpName::SEMICOLON)) {
             continue;
         }
         else if (match(Token::EOF)) {
-            throw SyntaxError("Reach end of file");
+            if (implicit_bracket) {
+                break;
+            }
+            else {
+                throw SyntaxError("Reach end of file");
+            }
         }
         else if (try_match(Token::ID)) {
-            auto find_result = typename_cache.find(next_token.get_name().to_string());
-            if (find_result == typename_cache.end()) {
+            if (typename_cache.has_key(next_token.get_name().to_cstr())) {
                 for (const auto& i : parse_var_decl()) {
                     ast->append(i);
                 }
             }
             else {
-                auto expr_ast = parse_expr();
-                if (expr_ast.exists()) {
-                    ast->append(expr_ast.cast<StmtAST>());
+                auto stmt_ast = parse_stmt();
+                if (stmt_ast.exists()) {
+                    ast->append(stmt_ast);
                 }
             }
         }
         else {
-            auto expr_ast = parse_expr();
-            if (expr_ast.exists()) {
-                ast->append(expr_ast.cast<StmtAST>());
+            auto stmt_ast = parse_stmt();
+            if (stmt_ast.exists()) {
+                ast->append(stmt_ast);
             }
         }
     }
 
-    return store_ast<BlockStmtAST>(ast);
+    return ast;
 }
 
 FunctionASTRef RDParser::parse_function_decl() {
@@ -525,19 +566,19 @@ ClassASTRef RDParser::parse_class_decl() {
         throw SyntaxError("Requires an identifier");
     }
     StringRef name = cur_token.get_name();
-    ClassAST* new_class = new ClassAST(name);
+    MemoryRef<ClassAST> new_class = store_ast_unconst(new ClassAST(name));
 
     if (match_op(OpName::COMP)) {
 
     }
     else if (match_op(OpName::SEMICOLON)) {
-        return store_ast<ClassAST>(new_class);
+        return new_class.to_const();
     }
     else {
         throw SyntaxError("Invalid class definition");
     }
 
-    if (typename_cache.find(name.to_string()) != typename_cache.end()) {
+    if (typename_cache.has_key(name.to_cstr())) {
         throw SyntaxError("Class has already defined: " + name);
     }
 
@@ -560,10 +601,13 @@ ClassASTRef RDParser::parse_class_decl() {
 
     // add into symbol table
     typename_cache.insert(name.to_string());
+    return new_class;
 }
 
 
-Constant* RDParser::parse_value(const RawValue& rawval) {
+ConstantRef RDParser::parse_value(const RawValue& rawval) {
+
+    Constant* ret;
 
     if (rawval.type != RawValue::STRING) {
         const char* vstr = rawval.strval.to_cstr();
@@ -571,33 +615,33 @@ Constant* RDParser::parse_value(const RawValue& rawval) {
 
         if (rawval.type == RawValue::BOOL) {
             char val = rawval.strval == "true" ? 0 : 1;
-            return new Constant(new PrimitiveType(Type::BOOL), (char*)&val, sizeof(val));
+            ret = new Constant(store_type(new PrimitiveType(Type::BOOL)), (char*)&val, sizeof(val));
         }
 
         else if (rawval.type == RawValue::CHAR) {
             char val = vstr[0];
-            return new Constant(new PrimitiveType(Type::INT), (char*)&val, sizeof(val));
+            ret = new Constant(store_type(new PrimitiveType(Type::INT)), (char*)&val, sizeof(val));
         }
 
         else if (rawval.type == RawValue::INT) {
             unsigned val = strtol(vstr, &end, 10);
-            return new Constant(new PrimitiveType(Type::INT), (char*)&val, sizeof(val));
+            ret = new Constant(store_type(new PrimitiveType(Type::INT)), (char*)&val, sizeof(val));
         }
 
         else if (rawval.type == RawValue::FLOAT) {
             double val = strtod(vstr, &end);
-            return new Constant(new PrimitiveType(Type::FLOAT), (char*)&val, sizeof(val));
+            ret = new Constant(store_type(new PrimitiveType(Type::FLOAT)), (char*)&val, sizeof(val));
         }
         else { //won't actually happen
-            return nullptr;
+            ret = nullptr;
         }
     }
     else {
-        return new Constant(
-            static_cast<Type*>(new PointerType(new PrimitiveType(Type::CHAR))),
+        ret = new Constant(store_type(new PointerType(store_type(new PrimitiveType(Type::CHAR)))),
             rawval.strval.to_cstr(), rawval.strval.length());
     }
 
+    return _context->constantpool.collect(ret).to_const();
 }
 
 void RDParser::eat() {

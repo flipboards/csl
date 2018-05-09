@@ -6,6 +6,7 @@
 #include "util/ioutil.h"
 #include "util/memory.h"
 #include "util/strmap.h"
+#include "context.h"
 #include "token.h"
 
 #include <string>
@@ -21,14 +22,14 @@ public:
 
     ~Lexer() {
         _reader = nullptr;
-        _strpool = nullptr;
+        _context = nullptr;
     }
 
     void clear();
 
-    void load(StrReader* reader, ConstStringPool* strpool) {
+    void load(StrReader* reader, Context* strpool) {
         _reader = reader;
-        _strpool = strpool;
+        _context = strpool;
     }
 
     Token get_token();
@@ -66,7 +67,7 @@ private:
     static StrMap<Keyword> keyword_loc;
 
     StrReader* _reader;
-    ConstStringPool* _strpool;
+    Context* _context;
     std::deque<Token> token_buf;
     StringTmpRef token_str;
     size_t next_get_pos;

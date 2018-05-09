@@ -31,10 +31,16 @@ public:
         next_look_token = Token(Token::NONE);
         _lexer.clear();
     }
+    
+    void load_context(Context* context) {
+        this->_context = context;
+    }
 
     ASTRef parse_file(const std::string& filename);
 
-    StmtASTRef parse_string(const std::string& str);
+    ExprASTRef parse_line_expr(const std::string& str);
+
+    BlockStmtASTRef parse_string(const std::string& str);
 
     const Lexer& get_lexer()const {
         return _lexer;
@@ -58,13 +64,13 @@ private:
 
     StmtASTRef parse_stmt();
 
-    BlockStmtASTRef parse_block_stmt();
+    BlockStmtASTRef parse_block_stmt(bool implicit_bracket=false);
 
     FunctionASTRef parse_function_decl();
 
     ClassASTRef parse_class_decl();
 
-    Constant* parse_value(const RawValue&);
+    ConstantRef parse_value(const RawValue&);
 
 
     void eat();
@@ -86,23 +92,26 @@ private:
     void match_required_symbol(OpName, char);
 
     template<typename Ty>
-    ConstMemoryRef<Ty> store_ast(const Ty* ptr) {
-        return _astpool->collect<Ty>(ptr).to_const();
+    MemoryRef<Ty> store_ast_unconst(Ty* ptr) {
+        return _context->astpool.collect<Ty>(ptr);
     }
 
-    TypeRef store_type(const Type* ptr) {
-        return _typepool->collect<Type>(ptr).to_const();
+    template<typename Ty>
+    ConstMemoryRef<Ty> store_ast(Ty* ptr) {
+        return _context->astpool.collect<Ty>(ptr).to_const();
+    }
+
+    TypeRef store_type(Type* ptr) {
+        return _context->typepool.collect<Type>(ptr).to_const();
     }
 
     /* StringRef is only used for intermediate representation; For searching, std::string is used */
 
-    static std::map<std::string, ASTRef> ast_cache;         // global cache for import different files
-    static std::unordered_set<std::string> typename_cache;  // defined classes
+    static std::map<std::string, ASTRef> ast_cache;     // global cache for import different files
+    static StrSet typename_cache;                       // defined classes
 
     Token cur_token, next_token, next_look_token;
-    ConstStringPool* _strpool;
-    MemoryPool* _astpool;
-    MemoryPool* _typepool;
+    Context* _context;
 
     Lexer _lexer;
 

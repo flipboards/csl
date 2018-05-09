@@ -32,6 +32,10 @@ public:
 
     }
 
+    ConstMemoryRef(std::nullptr_t) : _p(nullptr) {
+
+    }
+
     ConstMemoryRef(const _Myt& other) : _p(other._p) {
         if (_p) _p->ref++;
     }
@@ -45,6 +49,11 @@ public:
         _p = other._p;
         if (_p) _p->ref++;
         return *this;
+    }
+
+    _Myt& operator=(std::nullptr_t) {
+        if (_p) _p->ref--;
+        _p = nullptr;
     }
 
     const Ty& operator*()const {
@@ -106,9 +115,9 @@ public:
     }
 
     _Myt& operator=(const _Myt& other) {
-        if (_p) _p->ref--;
-        _p = other._p;
-        if (_p) _p->ref++;
+        if (this->_p) this->_p->ref--;
+        this->_p = other._p;
+        if (this->_p) this->_p->ref++;
         return *this;
     }
 
@@ -117,11 +126,11 @@ public:
     }
 
     Ty* operator->(){
-        return static_cast<Ty*>(_p->ptr);
+        return static_cast<Ty*>(this->_p->ptr);
     }
 
     Ty* get() {
-        return static_cast<Ty*>(_p->ptr);
+        return static_cast<Ty*>(this->_p->ptr);
     }
 
     ConstMemoryRef<Ty> to_const()const {
@@ -131,7 +140,7 @@ public:
     /* Static cast to other pointer */
     template<typename NTy>
     MemoryRef<NTy> cast()const {
-        return MemoryRef<NTy>::_build(_p);
+        return MemoryRef<NTy>::_build(this->_p);
     }
 
     /* Build a new ConstMemRef from a pointer. Do not use directly*/
@@ -146,6 +155,7 @@ public:
 
 class MemoryPool {
 public:
+
     MemoryPool() {
 
     } 
@@ -176,6 +186,9 @@ public:
     Do not *FREE* the original pointer */
     template<typename Ty>
     MemoryRef<Ty> collect(Ty* t) {
+        if (t == nullptr) {
+            return MemoryRef<Ty>();
+        }
         _mylist.push_front(MemoryBlock(t));
         return MemoryRef<Ty>::_build(&_mylist.front());
     }

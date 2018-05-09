@@ -138,11 +138,15 @@ typedef ConstMemoryRef<ExprAST> ExprASTRef;
 class OpAST : public ExprAST {
 public:
 
-    OpAST() : ExprAST(OP), lhs(nullptr), rhs(nullptr) {
+    OpAST() : ExprAST(OP) {
 
     }
 
-    explicit OpAST(Operator op) : op(op), lhs(nullptr), rhs(nullptr) {
+    explicit OpAST(Operator op) : op(op) {
+
+    }
+
+    explicit OpAST(Operator op, const ExprASTRef& lhs) : op(op), lhs(lhs) {
 
     }
 
@@ -182,7 +186,7 @@ private:
 class ValueAST : public ExprAST {
 public:
 
-    ValueAST() : ExprAST(VALUE), data(nullptr) {
+    ValueAST() : ExprAST(VALUE) {
 
     }
 
@@ -259,7 +263,7 @@ private:
 class CallAST : public ExprAST {
 public:
 
-    CallAST() : ExprAST(CALL), callee(nullptr) {
+    CallAST() : ExprAST(CALL) {
 
     }
 
@@ -278,6 +282,14 @@ public:
         else {
             argv.push_back(child);
         }
+    }
+
+    void set_callee(const ConstMemoryRef<IdAST>& callee) {
+        this->callee = callee;
+    }
+
+    void add_arg(const ExprASTRef& arg) {
+        argv.push_back(arg);
     }
 
     void print(std::ostream& os, char indent = '\t', int level = 0)const {
@@ -349,15 +361,15 @@ public:
 
     }
 
-    explicit TypeAST(const TypeRef& type) : relation(NONE), child(type.cast<void>()) {
+    explicit TypeAST(const TypeRef& type) : relation(NONE), child(type.cast<char>()) {
 
     }
 
-    explicit TypeAST(const ConstMemoryRef<TypeAST>& pointee) : relation(POINTER), child(pointee.cast<void>()) {
+    explicit TypeAST(const ConstMemoryRef<TypeAST>& pointee) : relation(POINTER), child(pointee.cast<char>()) {
 
     }
 
-    explicit TypeAST(const StringRef& classname) : relation(CLASS), child(classname.to_memref().cast<void>()) {
+    explicit TypeAST(const StringRef& classname) : relation(CLASS), child(classname.cast<char>()) {
 
     }
 
@@ -422,7 +434,7 @@ public:
 protected:
     
     RelationToChild relation;
-    ConstMemoryRef<void> child;
+    ConstMemoryRef<char> child;
 };
 
 typedef ConstMemoryRef<TypeAST> TypeASTRef;
@@ -455,7 +467,7 @@ private:
 class VarDeclAST : public DeclAST {
 public:
 
-    VarDeclAST() : DeclAST(DECL), vartype(nullptr), initializer(nullptr) {
+    VarDeclAST() : DeclAST(DECL) {
 
     }
 
@@ -473,7 +485,7 @@ public:
 
     void print(std::ostream& os, char indent = '\t', int level = 0)const {
         os << std::string(level, indent) << std::endl;
-        os << "Declaration of name: " << varname.to_cstr() << std::endl;
+        os << "DEFINE " << varname.to_cstr() << std::endl;
         vartype->print(os, indent, level + 1);
         if (initializer.exists()) {
             initializer->print(os, indent, level + 1);
@@ -497,7 +509,7 @@ public:
 
     }
 
-    void append(const ConstMemoryRef<VarDeclAST>& d) {
+    void append(const VarDeclASTRef& d) {
         decl_list.push_back(d);
     }
 
@@ -505,7 +517,7 @@ public:
         stmt_list.push_back(d);
     }
 
-    void print(std::ostream& os, char indent='\t', unsigned level=0) {
+    void print(std::ostream& os, char indent='\t', unsigned level=0)const {
         os << std::string(level, indent) << "[Block]" << std::endl;
         for (const auto& d : decl_list) {
             d->print(os, indent, level + 1);
@@ -527,12 +539,12 @@ class IfAST : public StmtAST {
 
 public:
 
-    IfAST() : StmtAST(IF), condition(nullptr), true_stmt(nullptr), false_stmt(nullptr) {
+    IfAST() : StmtAST(IF) {
 
     }
 
     explicit IfAST(const ExprASTRef& expr_cond, const StmtASTRef& true_stmt) :
-        condition(expr_cond), true_stmt(true_stmt), false_stmt(nullptr) {
+        condition(expr_cond), true_stmt(true_stmt) {
 
     }
 
@@ -551,7 +563,7 @@ private:
 class WhileAST : public StmtAST {
 public:
 
-    WhileAST() : StmtAST(WHILE), condition(nullptr), loop_stmt(nullptr) {
+    WhileAST() : StmtAST(WHILE) {
 
     }
 
@@ -569,10 +581,7 @@ private:
 class ForAST : public StmtAST {
 public:
 
-    ForAST() : StmtAST(FOR), init_expr(nullptr),
-        condition(nullptr),
-        loop_expr(nullptr),
-        loop_stmt(nullptr) {
+    ForAST() : StmtAST(FOR) {
 
     }
 
@@ -613,7 +622,7 @@ public:
 class ReturnAST : public StmtAST {
 public:
 
-    ReturnAST() : StmtAST(RETURN), ret_expr(nullptr) {
+    ReturnAST() : StmtAST(RETURN) {
 
     }
 
@@ -630,11 +639,11 @@ private:
 class FunctionAST : public DeclAST {
 public:
 
-    FunctionAST() : DeclAST(FUNCTION), ret_type(nullptr), body(nullptr) {
+    FunctionAST() : DeclAST(FUNCTION) {
 
     }
 
-    explicit FunctionAST(const StringRef& name) : name(name), ret_type(nullptr), body(nullptr) {
+    explicit FunctionAST(const StringRef& name) : name(name) {
 
     }
 

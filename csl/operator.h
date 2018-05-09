@@ -49,9 +49,16 @@ enum class Operator : unsigned {
 };
 
 
+inline bool is_valid(Operator op) {
+    return op <= Operator::POSTINC || 
+        op >= Operator::MBER && op <= Operator::INDEX || 
+        op >= Operator::EQ && op <= Operator::NOT || 
+        op >= Operator::ASN && op <= Operator::POWASN;
+}
+
 // return if op belongs to '[+-*/%^]?=' (assignment)
 inline bool is_assignment(Operator op) {
-    return op >= Operator::ASN;
+    return op >= Operator::ASN && op <= Operator::POWASN;
 }
 
 // return if op belongs to + - * / ^ %

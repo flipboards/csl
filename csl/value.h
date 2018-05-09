@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "util/memory.h"
 #include "type.h"
 
 
@@ -23,7 +24,7 @@ public:
 
     }
 
-    explicit Value(const Type* tp, bool is_const) : type(tp), 
+    explicit Value(const TypeRef& tp, bool is_const) : type(tp), 
         is_const(is_const) {
 
     }
@@ -32,7 +33,7 @@ public:
 
     }
 
-    const Type* get_type()const {
+    TypeRef get_type()const {
         return type;
     }
 
@@ -42,7 +43,7 @@ public:
 
 protected:
 
-    const Type* type;
+    TypeRef type;
     bool is_const;
 };
 
@@ -54,8 +55,8 @@ public:
 
     }
 
-    Constant(const Type* tp, const char* v_start, size_t size) :
-        Value(tp), buffer(v_start, v_start + size) {
+    Constant(const TypeRef& tp, const char* v_start, size_t size) :
+        Value(tp, true), buffer(v_start, v_start + size) {
 
     }
 
@@ -110,6 +111,7 @@ private:
     ByteRef buffer;
 };
 
+typedef ConstMemoryRef<Constant> ConstantRef;
 
 class GlobalValue : public Value {
 public:

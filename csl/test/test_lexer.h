@@ -29,11 +29,11 @@ public:
 
     void test_lexer() {
 
-        ConstStringPool pool;
+        Context context;
         StrReader reader("x_2  \t2e-7+-=++'\t'\"1+x\\\"\"  ");
 
         Lexer lexer;
-        lexer.load(&reader, &pool);
+        lexer.load(&reader, &context);
         
         std::vector<Token> token_list;
         for (int i = 0; i < 8; i++) {
@@ -46,8 +46,7 @@ public:
         assert(token_list[2].get_operator() == OpName::ADD);
         assert(token_list[3].get_operator() == OpName::SUBASN);
         assert(token_list[4].get_operator() == OpName::INC);
-        printf("%s", token_list[6].get_value().strval.get());
-    //    assert(token_list[5].get_value().type == RawValue::STRING && token_list[5].get_value().strval == "\t");
+        assert(token_list[5].get_value().type == RawValue::CHAR && token_list[5].get_value().strval == "\t");
         assert(token_list[6].get_value().type == RawValue::STRING && token_list[6].get_value().strval == "1+x\\\"");
         assert(token_list[7].get_type() == Token::EOF);
     }

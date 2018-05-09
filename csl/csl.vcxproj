@@ -117,18 +117,20 @@
   <ItemGroup>
     <ClCompile Include="lexer.cpp" />
     <ClCompile Include="logger.cpp" />
+    <ClCompile Include="rdparser.cpp" />
     <ClCompile Include="test\main.cpp" />
     <ClCompile Include="test\test_lexer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ast.h" />
-    <ClInclude Include="astbuilder.h" />
+    <ClInclude Include="context.h" />
     <ClInclude Include="logger.h" />
     <ClInclude Include="grammar\grammar.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="operator.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="test\test_mempool.h" />
+    <ClInclude Include="test\test_parser.h" />
     <ClInclude Include="test\test_strmap.h" />
     <ClInclude Include="token.h" />
     <ClInclude Include="type.h" />
@@ -137,6 +139,7 @@
     <ClInclude Include="util\memory.h" />
     <ClInclude Include="util\strmap.h" />
     <ClInclude Include="util\strutil.h" />
+    <ClInclude Include="value.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

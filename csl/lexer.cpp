@@ -160,5 +160,5 @@ bool Lexer::match(const std::regex& re) {
 
 StringRef Lexer::make_ref(const std::string & str)
 {
-    return _strpool->assign(str);
+    return _context->strpool.assign(str);
 }

@@ -3,7 +3,7 @@
 #define STRMAP_H
 
 #include <map>
-#include <unordered_map>
+#include <set>
 #include <list>
 #include <string>
 
@@ -31,6 +31,10 @@ public:
 
     size_t length()const {
         return end - begin;
+    }
+
+    const char* get()const {
+        return begin;
     }
 
     bool operator==(const StringTmpRef& other)const {
@@ -72,6 +76,7 @@ private:
 };
 
 
+/* Implementation of std::map on StringTmpRef */
 template<typename Ty>
 class StrMap {
 public:
@@ -141,6 +146,70 @@ private:
     std::list<std::string> _strkeys;
     _MyMap _map;
 };
+
+
+
+class StrSet {
+public:
+
+    typedef std::set<StringTmpRef> _MySet;
+    typedef _MySet::const_iterator const_iterator;
+    typedef _MySet::iterator iterator;
+
+    StrSet() {
+
+    }
+
+    StrSet(const std::initializer_list<std::string>& init_list) {
+        for (const auto& p : init_list) {
+            _strkeys.push_front(p);
+            _set.insert(StringTmpRef(_strkeys.front()));
+        }
+    }
+
+    const_iterator begin()const {
+        return _set.begin();
+    }
+
+    const_iterator end()const {
+        return _set.end();
+    }
+
+    const_iterator find(const StringTmpRef& str)const {
+        return _set.find(str);
+    }
+
+    const_iterator find(const std::string& str)const {
+        return _set.find(StringTmpRef(str));
+    }
+
+    const_iterator find(const char* str)const {
+        return _set.find(StringTmpRef(str));
+    }
+
+    bool has_key(const StringTmpRef& str)const {
+        return _set.find(str) != _set.end();
+    }
+
+    bool has_key(const char* str)const {
+        return has_key(StringTmpRef(str));
+    }
+
+    bool has_key(const std::string& str)const {
+        return has_key(StringTmpRef(str));
+    }
+
+    std::pair<iterator, bool> insert(const std::string& str) {
+        _strkeys.push_front(str);
+        return _set.insert(StringTmpRef(_strkeys.front()));
+    }
+
+private:
+
+    std::list<std::string> _strkeys;
+    _MySet _set;
+};
+
 
 #undef Min
 #endif

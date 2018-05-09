@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <string>
+#include <ostream>
 
 #include "util/memory.h"
 
@@ -173,7 +174,7 @@ public:
 
 	// get value from a VALUE-token
 	RawValue get_value() {
-		assert(_type == VALUE && "Cannot get value to non-value");
+		assert(_type == VALUE && "Cannot get value from non-value");
 		return { static_cast<RawValue::Type>(_uintdata), _strdata};
 	}
 
@@ -183,6 +184,32 @@ public:
 		_uintdata = static_cast<unsigned>(type);
 		_strdata = data;
 	}
+
+    void print(std::ostream& os)const {
+        switch (_type)
+        {
+        case Token::NONE:
+            os << "[]";
+            break;
+        case Token::VALUE:
+            os << "[value " << _strdata.to_cstr() << "]";
+            break;
+        case Token::ID:
+            os << "[id " << _strdata.to_cstr() << "]";
+            break;
+        case Token::OP:
+            os << "[operator " << _uintdata << "]";
+            break;
+        case Token::KEYWORD:
+            os << "[keyword " << _uintdata << "]";
+            break;
+        case Token::EOF:
+            os << "[eof]";
+            break;
+        default:
+            break;
+        }
+    }
 
 private:
 
