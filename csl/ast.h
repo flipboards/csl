@@ -2,19 +2,19 @@
 #ifndef CSL_AST_H
 #define CSL_AST_H
 
+#include "type.h"
+#include "value.h"
+#include "operator.h"
+#include "util/memory.h"
 
 #include <vector>
 #include <string>
 #include <ostream>
 #include <cstring>
 
-#include "util/memory.h"
-#include "operator.h"
-#include "type.h"
-#include "value.h"
+namespace csl{
 
-
-
+	// Base of all AST classes
 class ASTBase {
 public:
     
@@ -46,10 +46,6 @@ public:
 
     }
 
-    explicit ASTBase(ASTType type) : mytype(type) {
-
-    }
-
     virtual void print(std::ostream&, char indent='\t', int level = 0)const {
 
     }
@@ -78,14 +74,15 @@ public:
         return mytype >= IF;
     }
 
-    /*  Notice: CSL Member class (AST, Token, ...) will not release *ANY* pointers
-        it holds. Please use references in MemoryPool.
-    */
     virtual ~ASTBase() {
 
     }
 
 protected:
+
+	explicit ASTBase(ASTType type) : mytype(type) {
+
+	}
 
     ASTType mytype;
 };
@@ -97,9 +94,7 @@ typedef ConstMemoryRef<ASTBase> ASTRef;
 class StmtAST : public ASTBase {
 public:
 
-    StmtAST() {
-
-    }
+protected:
 
     explicit StmtAST(ASTType type) : ASTBase(type) {
 
@@ -112,24 +107,15 @@ typedef ConstMemoryRef<StmtAST> StmtASTRef;
 class ExprAST : public StmtAST {
 public:
 
-    ExprAST() {
-
-    }
-
-    explicit ExprAST(ASTType type) : StmtAST(type) {
-
-    }
-
     virtual void print(std::ostream&, char indent='\t', int level = 0)const {
 
     }
 
-    virtual void add_child(const ConstMemoryRef<ExprAST>& child) {
+protected:
+
+    explicit ExprAST(ASTType type) : StmtAST(type) {
 
     }
-
-private:
-
 };
 
 typedef ConstMemoryRef<ExprAST> ExprASTRef;
@@ -142,15 +128,15 @@ public:
 
     }
 
-    explicit OpAST(Operator op) : op(op) {
+    explicit OpAST(Operator op) : ExprAST(OP), op(op) {
 
     }
 
-    explicit OpAST(Operator op, const ExprASTRef& lhs) : op(op), lhs(lhs) {
+    explicit OpAST(Operator op, const ExprASTRef& lhs) : ExprAST(OP), op(op), lhs(lhs) {
 
     }
 
-    explicit OpAST(Operator op, const ExprASTRef& lhs, const ExprASTRef& rhs) : op(op),
+    explicit OpAST(Operator op, const ExprASTRef& lhs, const ExprASTRef& rhs) : ExprAST(OP), op(op),
         lhs(lhs), rhs(rhs) {
 
     }
@@ -190,11 +176,7 @@ public:
 
     }
 
-    explicit ValueAST(const ConstMemoryRef<Constant>& c) : data(c) {
-    }
-
-    void add_child(const ExprASTRef&) {
-        throw std::out_of_range("Cannot add child to identifier");
+    explicit ValueAST(const ConstMemoryRef<Constant>& c) : ExprAST(VALUE), data(c) {
     }
 
     void print(std::ostream& os, char indent = '\t', int level = 0)const {
@@ -236,12 +218,8 @@ public:
 
     }
 
-    explicit IdAST(const StringRef& name) : name(name) {
+    explicit IdAST(const StringRef& name) : ExprAST(ID), name(name) {
 
-    }
-
-    void add_child(const ExprASTRef&) {
-        throw std::out_of_range("Cannot add child to identifier");
     }
 
     void print(std::ostream& os, char indent = '\t', int level = 0)const {
@@ -268,20 +246,6 @@ public:
     }
 
     ~CallAST() {
-    }
-
-    void add_child(const ExprASTRef& child) {
-        if (!callee) {
-            if (child->is_id()) {
-                callee = child.cast<IdAST>();
-            }
-            else {
-                throw std::runtime_error("Not an id");
-            }
-        }
-        else {
-            argv.push_back(child);
-        }
     }
 
     void set_callee(const ConstMemoryRef<IdAST>& callee) {
@@ -315,7 +279,7 @@ public:
 
     }
 
-    void add_child(const ExprASTRef& child) {
+    void add_element(const ExprASTRef& child) {
         member.push_back(child);
     }
 
@@ -543,13 +507,13 @@ public:
 
     }
 
-    explicit IfAST(const ExprASTRef& expr_cond, const StmtASTRef& true_stmt) :
+    explicit IfAST(const ExprASTRef& expr_cond, const StmtASTRef& true_stmt) : StmtAST(IF),
         condition(expr_cond), true_stmt(true_stmt) {
 
     }
 
-    explicit IfAST(const ExprASTRef& expr_cond, const StmtASTRef& true_stmt, const StmtASTRef& false_stmt) :
-        condition(expr_cond), true_stmt(true_stmt), false_stmt(false_stmt) {
+    explicit IfAST(const ExprASTRef& expr_cond, const StmtASTRef& true_stmt, const StmtASTRef& false_stmt) : 
+		StmtAST(IF), condition(expr_cond), true_stmt(true_stmt), false_stmt(false_stmt) {
 
     }
 
@@ -568,7 +532,7 @@ public:
     }
 
     explicit WhileAST(const ExprASTRef& expr_cond, const StmtASTRef& stmt) :
-        condition(expr_cond), loop_stmt(stmt) {
+		StmtAST(WHILE), condition(expr_cond), loop_stmt(stmt) {
 
     }
 
@@ -587,6 +551,7 @@ public:
 
     explicit ForAST(const ExprASTRef& init_expr, const ExprASTRef& cond_expr, const ExprASTRef& loop_expr, 
         const StmtASTRef& loop_stmt) :
+		StmtAST(FOR),
         init_expr(init_expr),
         condition(cond_expr),
         loop_expr(loop_expr),
@@ -626,7 +591,7 @@ public:
 
     }
 
-    explicit ReturnAST(const ExprASTRef& ret_expr) : ret_expr(ret_expr) {
+    explicit ReturnAST(const ExprASTRef& ret_expr) : StmtAST(RETURN), ret_expr(ret_expr) {
 
     }
 
@@ -706,5 +671,7 @@ private:
 };
 
 typedef typename ConstMemoryRef<ClassAST> ClassASTRef;
+
+}
 
 #endif // !CSL_AST_H

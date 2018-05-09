@@ -3,18 +3,20 @@
 #ifndef CSL_LEXER_H
 #define CSL_LEXER_H
 
+#include "context.h"
+#include "token.h"
 #include "util/ioutil.h"
 #include "util/memory.h"
 #include "util/strmap.h"
-#include "context.h"
-#include "token.h"
 
 #include <string>
 #include <regex>
 #include <deque>
 #include <unordered_map>
 
+namespace csl {
 
+	/* Lex analyzer */
 class Lexer {
 public:
 
@@ -40,10 +42,6 @@ public:
 
     size_t cur_pos()const {
         return _reader->pos();
-    }
-
-    const StrReader* get_reader()const {
-        return _reader;
     }
 
 private:
@@ -74,5 +72,6 @@ private:
     size_t next_look_pos;
 };
 
+}
 
 #endif

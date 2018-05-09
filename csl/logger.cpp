@@ -1,8 +1,7 @@
 
 #include "logger.h"
 
-
-void output_error(std::ostream& os, const CSLError & error, const StrReader * reader) {
+void csl::output_error(std::ostream& os, const CSLError & error, const StrReader * reader) {
 
     if (error.get_id() == CSLError::NONE) {
         os << "Unknown Error: " << error.what() << std::endl;
@@ -12,10 +11,10 @@ void output_error(std::ostream& os, const CSLError & error, const StrReader * re
         os << "Syntax Error: " << error.what() << std::endl;
     }
 
-    output_context(os, reader);
+    csl::output_context(os, reader);
 }
 
-void output_context(std::ostream & os, const StrReader* reader) {
+void csl::output_context(std::ostream & os, const StrReader* reader) {
 
     size_t linepos = reader->iter() - reader->cur_line_begin();
 

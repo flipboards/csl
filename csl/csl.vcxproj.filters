@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="grammar">
-      <UniqueIdentifier>{1e965dd4-095e-4eba-bf61-026232457511}</UniqueIdentifier>
-    </Filter>
     <Filter Include="util">
       <UniqueIdentifier>{002c7ca1-765a-473d-bd05-129aeaedd40d}</UniqueIdentifier>
     </Filter>
@@ -13,6 +10,9 @@
     <Filter Include="csl">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="ide">
+      <UniqueIdentifier>{19a605b8-0a69-412b-b333-8cb6feb2ecaf}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -35,9 +35,6 @@
   <ItemGroup>
     <ClInclude Include="lexer.h">
       <Filter>csl</Filter>
-    </ClInclude>
-    <ClInclude Include="grammar\grammar.h">
-      <Filter>grammar</Filter>
     </ClInclude>
     <ClInclude Include="token.h">
       <Filter>csl</Filter>
@@ -87,5 +84,10 @@
     <ClInclude Include="test\test_parser.h">
       <Filter>test</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="csl.natvis">
+      <Filter>ide</Filter>
+    </Natvis>
   </ItemGroup>
 </Project>

@@ -125,7 +125,6 @@
     <ClInclude Include="ast.h" />
     <ClInclude Include="context.h" />
     <ClInclude Include="logger.h" />
-    <ClInclude Include="grammar\grammar.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="operator.h" />
     <ClInclude Include="parser.h" />
@@ -140,6 +139,9 @@
     <ClInclude Include="util\strmap.h" />
     <ClInclude Include="util\strutil.h" />
     <ClInclude Include="value.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="csl.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

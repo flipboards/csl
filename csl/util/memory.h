@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef CSL_UTIL_MEMORY_H
-#define CSL_UTIL_MEMORY_H
+#ifndef CSL_UTIL_MEMORYPOOL_H
+#define CSL_UTIL_MEMORYPOOL_H
 
 #include <list>
 #include <string>

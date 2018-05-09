@@ -8,8 +8,12 @@
 
 #include <ostream>
 
+namespace csl {
+
 void output_error(std::ostream&, const CSLError&, const StrReader*);
 
 void output_context(std::ostream&, const StrReader*);
+
+}
 
 #endif

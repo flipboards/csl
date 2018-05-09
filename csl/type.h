@@ -3,14 +3,15 @@
 #ifndef CSL_TYPE_H
 #define CSL_TYPE_H
 
+#include "util/memory.h"
+
 #include <ostream>
 #include <vector>
 #include <string>
 
-#include "util/memory.h"
+namespace csl {
 
-
-// Base of all types
+// Base of all types. Do not use directly
 class Type {
 public:
 
@@ -31,7 +32,7 @@ public:
 
     }
 
-    Type(const TypeID id) : id(id) {
+    explicit Type(const TypeID id) : id(id) {
 
     }
 
@@ -74,7 +75,7 @@ protected:
 
 typedef ConstMemoryRef<Type> TypeRef;
 
-// basic types (void, bool, char, int, float)
+// Basic types (void, bool, char, int, float)
 class PrimitiveType : public Type {
 public:
     PrimitiveType() : Type() {
@@ -109,7 +110,7 @@ public:
     }
 };
 
-// pointer
+// Pointer type
 class PointerType : public Type {
 public:
 
@@ -130,7 +131,7 @@ private:
     TypeRef pointee;
 };
 
-
+// Array type
 class ArrayType : public Type {
 public:
 
@@ -154,7 +155,7 @@ private:
     unsigned elnum;
 };
 
-
+// Class type (self-defined type)
 class ClassType : public Type {
 public:
 
@@ -176,5 +177,7 @@ private:
     StringRef name;
     std::vector<TypeRef> eltypes;
 };
+
+}
 
 #endif

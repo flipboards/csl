@@ -4,6 +4,8 @@
 
 #include "util/memory.h"
 
+namespace csl {
+
 class Context {
 public:
 
@@ -11,5 +13,6 @@ public:
     MemoryPool astpool, constantpool, typepool;
 };
 
+}
 
 #endif

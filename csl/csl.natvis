@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+ 
+  <Type Name="StringRef">
+    <DisplayString Condition="_p == 0">nullptr</DisplayString>
+    <DisplayString Condition="_p != 0">{_p->ptr,s}</DisplayString>
+    <StringView Condition="_p != 0">_p->ptr,s</StringView>
+  </Type>
+
+  <Type Name="MemoryRef&lt;*&gt;">
+    <AlternativeType Name="ConstMemoryRef&lt;*&gt;"/>
+    <SmartPointer Usage="Minimal">($T1 *)_p->ptr,na</SmartPointer>
+    <DisplayString Condition="_p == 0">nullptr</DisplayString>
+    <DisplayString Condition="_p != 0">{*($T1 *)_p->ptr}</DisplayString>
+    <Expand>
+      <Item Name="ptr" Condition="_p != 0">($T1 *)_p->ptr</Item>
+      <Item Name="ref" Condition="_p != 0">_p->ref</Item>
+    </Expand>
+  </Type>
+  
+</AutoVisualizer>

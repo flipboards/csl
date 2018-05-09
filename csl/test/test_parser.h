@@ -2,6 +2,8 @@
 #include "../parser.h"
 #include <iostream>
 
+using namespace csl;
+
 class ParserTest {
 public:
 

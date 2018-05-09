@@ -1,4 +1,4 @@
-#pragma once
+/* Operator and configurations */
 
 #ifndef CSL_OPERATOR_H
 #define CSL_OPERATOR_H
@@ -6,6 +6,9 @@
 #include <unordered_map>
 #include <ostream>
 
+namespace csl {
+
+/* Operator */
 enum class Operator : unsigned {
     NONE = 0x00,
     ADD = 0x01, 
@@ -48,7 +51,19 @@ enum class Operator : unsigned {
 
 };
 
+const std::unordered_map<Operator, unsigned> _precedence{
+	{ Operator::NONE, 100 },
+	{ Operator::ADD, 5 },{ Operator::SUB, 5 },
+	{ Operator::MUL, 4 },{ Operator::DIV, 4 },{ Operator::MOD, 4 },
+	{ Operator::POW, 3 },
+	{ Operator::PLUS, 2 },{ Operator::MINUS, 2 },{ Operator::INC, 2 },{ Operator::DEC, 2 },
+	{ Operator::POSTINC, 1 },{ Operator::POSTDEC, 1 },
+	{ Operator::EQ, 7 },{ Operator::NE, 7 },
+	{ Operator::LT, 6 },{ Operator::LE, 6 },{ Operator::GT, 6 },{ Operator::GE, 6 },
+	{ Operator::AND, 8 },{ Operator::XOR, 9 },{ Operator::OR, 10 }
+};
 
+// if an "Operator" is in operator range
 inline bool is_valid(Operator op) {
     return op <= Operator::POSTINC || 
         op >= Operator::MBER && op <= Operator::INDEX || 
@@ -83,22 +98,10 @@ inline bool is_binary(Operator op) {
 
 // return precedence
 inline unsigned get_precedence(Operator op) {
-
-    static std::unordered_map<Operator, unsigned> precedence{
-        { Operator::NONE, 100 },
-        { Operator::ADD, 5 },{ Operator::SUB, 5 },
-        { Operator::MUL, 4 },{ Operator::DIV, 4 },{ Operator::MOD, 4 },
-        { Operator::POW, 3 },
-        { Operator::PLUS, 2 },{ Operator::MINUS, 2 },{ Operator::INC, 2 },{ Operator::DEC, 2 },
-        { Operator::POSTINC, 1 },{ Operator::POSTDEC, 1 },
-        { Operator::EQ, 7 },{ Operator::NE, 7 },
-        { Operator::LT, 6 },{ Operator::LE, 6 },{ Operator::GT, 6 },{ Operator::GE, 6 },
-        { Operator::AND, 8 },{ Operator::XOR, 9 },{ Operator::OR, 10 }
-    };
-
-    return precedence.at(op);
+    return _precedence.at(op);
 }
 
+// print an operator
 inline void print_op(Operator op, std::ostream& os) {
 #define PRINT_OP(p) case(Operator::p): os << #p; break;
 
@@ -144,5 +147,6 @@ inline void print_op(Operator op, std::ostream& os) {
 #undef PRINT_OP
 }
 
+}
 
 #endif

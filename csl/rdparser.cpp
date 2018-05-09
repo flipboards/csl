@@ -4,6 +4,7 @@
 
 #include "util/errors.h"
 
+using namespace csl;
 
 std::map<std::string, ASTRef> RDParser::ast_cache;
 StrSet RDParser::typename_cache = { "void", "bool", "char", "int", "float" };
@@ -354,9 +355,9 @@ std::vector<VarDeclASTRef> RDParser::parse_var_decl() {
 ExprASTRef RDParser::parse_initializer()
 {
     if (match_op(OpName::COMP)) {
-        ExprAST* initializer = new ListAST();
+        ListAST* initializer = new ListAST();
         while (1) {
-            initializer->add_child(parse_initializer());
+            initializer->add_element(parse_initializer());
             if (!match_op(OpName::COMMA)) {
                 break;
             }

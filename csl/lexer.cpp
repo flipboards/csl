@@ -1,11 +1,11 @@
 
-#include <cassert>
-#include <regex>
-
-#include "token.h"
 #include "lexer.h"
 #include "util/errors.h"
-#include "util/strutil.h"
+
+#include <regex>
+#include <cassert>
+
+using namespace csl;
 
 std::regex Lexer::re_id("[_a-zA-Z][_0-9a-zA-Z]*");
 std::regex Lexer::re_char("'(?:\\\\.|[^'\\\\])*'");

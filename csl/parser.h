@@ -2,16 +2,14 @@
 #ifndef CSL_PARSER_H
 #define CSL_PARSER_H
 
-#include <string>
-#include <map>
-#include <unordered_set>
-
-#include "util/memory.h"
-#include "token.h"
 #include "lexer.h"
 #include "ast.h"
 #include "value.h"
+#include "util/memory.h"
+#include "util/strmap.h"
 
+
+namespace csl{
 
 // Parser using recursive descent algorithm
 class RDParser {
@@ -116,5 +114,7 @@ private:
     Lexer _lexer;
 
 };
+
+}
 
 #endif // !CSL_PARSER_H

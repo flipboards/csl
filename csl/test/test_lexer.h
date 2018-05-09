@@ -1,5 +1,7 @@
 #include "../lexer.h"
 
+using namespace csl;
+
 class LexerTest {
 public:
 

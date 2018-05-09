@@ -3,14 +3,16 @@
 #ifndef CSL_TOKEN_H
 #define CSL_TOKEN_H
 
-#include <cassert>
+#include "util/memory.h"
+
 #include <string>
 #include <ostream>
-
-#include "util/memory.h"
+#include <cassert>
 
 #ifdef EOF
 #undef EOF
+
+namespace csl {
 
 /* Keywords used in lexer */
 enum class Keyword : unsigned {
@@ -78,11 +80,11 @@ enum class OpName : unsigned {
 /* Stores an uncasted value (in string form) */
 struct RawValue {
 	enum Type {
-		BOOL=0x02,
-		CHAR=0x03,
-		INT=0x04,
-		FLOAT=0x05,
-		STRING=0x08
+		BOOL = 0x02,
+		CHAR = 0x03,
+		INT = 0x04,
+		FLOAT = 0x05,
+		STRING = 0x08
 	};
 
 	Type type;
@@ -217,6 +219,8 @@ private:
 	unsigned _uintdata;		// stores op/keyword
 	StringRef _strdata;		// stores id/value
 };
+
+}
 
 #endif
 #endif

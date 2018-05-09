@@ -9,27 +9,22 @@
 #include "util/memory.h"
 #include "type.h"
 
+namespace csl {
 
 typedef std::vector<char> ByteRef;
 
-
+/* Base of all values. Do not use directly */
 class Value {
 public:
 
+	enum ValueID {
+		CONSTANT,
+		GLOBALVAR,
+		FUNCTION,
+		LOCALVAR
+	};
+
     Value() : type(nullptr) {
-
-    }
-
-    explicit Value(bool is_const) : is_const(is_const) {
-
-    }
-
-    explicit Value(const TypeRef& tp, bool is_const) : type(tp), 
-        is_const(is_const) {
-
-    }
-
-    virtual ~Value() {
 
     }
 
@@ -38,25 +33,33 @@ public:
     }
 
     bool is_constant()const {
-        return is_const;
+        return _id == CONSTANT || _id == GLOBALVAR || _id == FUNCTION;
     }
 
 protected:
 
+	explicit Value(ValueID id) : _id(id) {
+
+	}
+
+	explicit Value(const TypeRef& tp, ValueID id) : type(tp), _id(id) {
+
+	}
+
     TypeRef type;
-    bool is_const;
+	ValueID _id;
 };
 
-
+/* Constant value (constant before compiling) */
 class Constant : public Value {
 public:
 
-    Constant() : Value(true) {
+    Constant() : Value(CONSTANT) {
 
     }
 
     Constant(const TypeRef& tp, const char* v_start, size_t size) :
-        Value(tp, true), buffer(v_start, v_start + size) {
+        Value(tp, CONSTANT), buffer(v_start, v_start + size) {
 
     }
 
@@ -113,19 +116,20 @@ private:
 
 typedef ConstMemoryRef<Constant> ConstantRef;
 
+/* Global variable & function. Only serves as a virtual pointer */
 class GlobalValue : public Value {
-public:
 
-    GlobalValue() : Value(true) {
+protected:
+
+    explicit GlobalValue(ValueID id) : Value(id) {
 
     }
 };
 
-
 class GlobalVar : public GlobalValue {
 public:
 
-    GlobalVar() {
+    GlobalVar() : GlobalValue(GLOBALVAR) {
 
     }
 };
@@ -138,5 +142,7 @@ class Function : public GlobalValue {
 class MemoryEntry : public Value {
 
 };
+
+}
 
 #endif
